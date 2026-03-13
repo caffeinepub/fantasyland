@@ -1,12 +1,21 @@
 import {
   ArrowLeft,
+  Camera,
   Heart,
+  Home,
   Image,
   MessageCircle,
+  Play,
+  Plus,
+  Search,
   Send,
+  User,
   Video,
+  X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useCamera } from "../camera/useCamera";
+import CameraModal from "./CameraModal";
 import UsernameTopBar from "./UsernameTopBar";
 
 interface Comment {
@@ -27,6 +36,16 @@ interface Post {
   liked: boolean;
   comments: Comment[];
   showComments: boolean;
+}
+
+interface Story {
+  id: number;
+  username: string;
+  mediaUrl?: string;
+  text?: string;
+  timestamp: Date;
+  color: string;
+  viewed: boolean;
 }
 
 interface Props {
@@ -87,6 +106,41 @@ const SAMPLE_POSTS: Post[] = [
   },
 ];
 
+const SAMPLE_STORIES: Story[] = [
+  {
+    id: 1,
+    username: "Phantom",
+    text: "Living my best fantasy life ✨ The energy tonight is immaculate!",
+    timestamp: new Date(Date.now() - 1000 * 60 * 30),
+    color: "oklch(0.65 0.28 305)",
+    viewed: false,
+  },
+  {
+    id: 2,
+    username: "Neon",
+    text: "Late night chats in the Chill Lounge 🌙 Who's up?",
+    timestamp: new Date(Date.now() - 1000 * 60 * 75),
+    color: "oklch(0.7 0.28 330)",
+    viewed: false,
+  },
+  {
+    id: 3,
+    username: "Ghost",
+    text: "Just won 5 games in a row at Game Zone 🎮 I'm unstoppable!",
+    timestamp: new Date(Date.now() - 1000 * 60 * 120),
+    color: "oklch(0.6 0.25 250)",
+    viewed: false,
+  },
+  {
+    id: 4,
+    username: "stranger",
+    text: "First time in FantasyLand. This place is wild 👀",
+    timestamp: new Date(Date.now() - 1000 * 60 * 200),
+    color: "oklch(0.65 0.22 50)",
+    viewed: false,
+  },
+];
+
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
   if (seconds < 60) return `${seconds}s ago`;
@@ -120,6 +174,90 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const nextId = useRef(100);
   const nextCommentId = useRef(200);
+  const [activeTab, setActiveTab] = useState<
+    "home" | "reels" | "direct" | "search" | "profile"
+  >("home");
+  const [showCameraModal, setShowCameraModal] = useState(false);
+
+  const camera = useCamera({ facingMode: "user", format: "image/jpeg" });
+
+  // Stop camera when modal closes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
+  useEffect(() => {
+    if (!showCameraModal && camera.isActive) {
+      camera.stopCamera();
+    }
+  }, [showCameraModal]);
+
+  // Stories state
+  const [stories, setStories] = useState<Story[]>(SAMPLE_STORIES);
+  const [viewingStory, setViewingStory] = useState<Story | null>(null);
+  const [showAddStory, setShowAddStory] = useState(false);
+  const [storyText, setStoryText] = useState("");
+  const [storyMedia, setStoryMedia] = useState<string | null>(null);
+  const [storyProgress, setStoryProgress] = useState(0);
+  const storyFileRef = useRef<HTMLInputElement>(null);
+  const nextStoryId = useRef(200);
+  const storyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Story viewer auto-dismiss
+  useEffect(() => {
+    if (!viewingStory) {
+      setStoryProgress(0);
+      if (storyTimerRef.current) clearInterval(storyTimerRef.current);
+      return;
+    }
+    setStoryProgress(0);
+    const start = Date.now();
+    const duration = 5000;
+    storyTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const pct = Math.min((elapsed / duration) * 100, 100);
+      setStoryProgress(pct);
+      if (pct >= 100) {
+        clearInterval(storyTimerRef.current!);
+        closeStory();
+      }
+    }, 50);
+    return () => {
+      if (storyTimerRef.current) clearInterval(storyTimerRef.current);
+    };
+  }, [viewingStory]);
+
+  const openStory = (story: Story) => {
+    setStories((prev) =>
+      prev.map((s) => (s.id === story.id ? { ...s, viewed: true } : s)),
+    );
+    setViewingStory({ ...story, viewed: true });
+  };
+
+  const closeStory = () => {
+    setViewingStory(null);
+  };
+
+  const handleAddStory = () => {
+    if (!storyText.trim() && !storyMedia) return;
+    const newStory: Story = {
+      id: nextStoryId.current++,
+      username,
+      text: storyText.trim() || undefined,
+      mediaUrl: storyMedia || undefined,
+      timestamp: new Date(),
+      color: getAvatarColor(username),
+      viewed: false,
+    };
+    setStories((prev) => [newStory, ...prev]);
+    setStoryText("");
+    setStoryMedia(null);
+    setShowAddStory(false);
+    if (storyFileRef.current) storyFileRef.current.value = "";
+  };
+
+  const handleStoryFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setStoryMedia(URL.createObjectURL(file));
+  };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -265,7 +403,120 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
         </div>
       </header>
 
-      <main className="relative z-10 max-w-2xl mx-auto px-4 py-8">
+      <main className="relative z-10 max-w-2xl mx-auto px-4 py-6">
+        {/* Stories */}
+        <div
+          className="mb-6 rounded-2xl p-4"
+          style={{
+            background: "oklch(0.12 0.035 275)",
+            border: "1px solid oklch(0.65 0.28 305 / 0.2)",
+            boxShadow: "0 0 20px oklch(0.65 0.28 305 / 0.06)",
+          }}
+        >
+          <p
+            className="text-xs font-semibold mb-3"
+            style={{ color: "oklch(0.55 0.08 280)" }}
+          >
+            Stories
+          </p>
+          <div
+            className="flex gap-4 overflow-x-auto pb-1"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {/* Your Story bubble */}
+            <button
+              type="button"
+              data-ocid="story.open_modal_button"
+              onClick={() => setShowAddStory(true)}
+              className="flex flex-col items-center gap-1.5 shrink-0"
+            >
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center relative"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.65 0.28 305), oklch(0.55 0.28 270))",
+                  padding: "2px",
+                  boxShadow: "0 0 14px oklch(0.65 0.28 305 / 0.45)",
+                }}
+              >
+                <div
+                  className="w-full h-full rounded-full flex items-center justify-center"
+                  style={{ background: "oklch(0.1 0.03 275)" }}
+                >
+                  <span
+                    className="text-base font-bold"
+                    style={{ color: getAvatarColor(username) }}
+                  >
+                    {username[0]?.toUpperCase()}
+                  </span>
+                </div>
+                <div
+                  className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full flex items-center justify-center"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, oklch(0.65 0.28 305), oklch(0.7 0.28 330))",
+                    border: "2px solid oklch(0.1 0.03 275)",
+                  }}
+                >
+                  <Plus size={10} style={{ color: "oklch(0.98 0 0)" }} />
+                </div>
+              </div>
+              <span
+                className="text-xs"
+                style={{ color: "oklch(0.62 0.08 280)" }}
+              >
+                Your Story
+              </span>
+            </button>
+
+            {/* Other stories */}
+            {stories.map((story, idx) => (
+              <button
+                key={story.id}
+                type="button"
+                data-ocid={`story.item.${idx + 1}`}
+                onClick={() => openStory(story)}
+                className="flex flex-col items-center gap-1.5 shrink-0"
+              >
+                <div
+                  className="w-14 h-14 rounded-full"
+                  style={{
+                    padding: "2px",
+                    background: story.viewed
+                      ? "oklch(0.28 0.04 280)"
+                      : "linear-gradient(135deg, oklch(0.85 0.22 350), oklch(0.65 0.28 305) 50%, oklch(0.55 0.3 270))",
+                    boxShadow: story.viewed
+                      ? "none"
+                      : "0 0 12px oklch(0.7 0.28 330 / 0.4)",
+                  }}
+                >
+                  <div
+                    className="w-full h-full rounded-full flex items-center justify-center"
+                    style={{ background: story.color }}
+                  >
+                    <span
+                      className="text-base font-bold"
+                      style={{ color: "oklch(0.98 0 0)" }}
+                    >
+                      {story.username[0]?.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+                <span
+                  className="text-xs max-w-14 truncate"
+                  style={{
+                    color: story.viewed
+                      ? "oklch(0.45 0.05 280)"
+                      : "oklch(0.78 0.08 280)",
+                  }}
+                >
+                  {story.username}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Composer */}
         <div
           className="rounded-2xl p-5 mb-8"
@@ -357,6 +608,19 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
               >
                 <Video size={13} /> Video
               </label>
+              <button
+                type="button"
+                data-ocid="social.camera_button"
+                onClick={() => setShowCameraModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-all duration-200"
+                style={{
+                  background: "oklch(0.16 0.05 280)",
+                  border: "1px solid oklch(0.55 0.15 305 / 0.4)",
+                  color: "oklch(0.72 0.22 305)",
+                }}
+              >
+                <Camera size={13} /> Camera
+              </button>
             </div>
             <button
               type="button"
@@ -635,6 +899,328 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
           caffeine.ai
         </a>
       </footer>
+
+      {/* Story Viewer Modal */}
+      {viewingStory && (
+        <div
+          data-ocid="story.modal"
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "oklch(0 0 0 / 0.92)" }}
+          onClick={closeStory}
+          onKeyDown={(e) => e.key === "Escape" && closeStory()}
+        >
+          <div
+            className="relative w-full max-w-sm mx-4 rounded-3xl overflow-hidden"
+            style={{ aspectRatio: "9/16", maxHeight: "85vh" }}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            {/* Progress bar */}
+            <div className="absolute top-0 left-0 right-0 z-10 px-3 pt-3">
+              <div
+                className="h-1 rounded-full overflow-hidden"
+                style={{ background: "oklch(0.98 0 0 / 0.25)" }}
+              >
+                <div
+                  className="h-full rounded-full transition-none"
+                  style={{
+                    width: `${storyProgress}%`,
+                    background:
+                      "linear-gradient(90deg, oklch(0.85 0.22 350), oklch(0.78 0.15 85))",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Story background */}
+            {viewingStory.mediaUrl ? (
+              <img
+                src={viewingStory.mediaUrl}
+                alt="story"
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            ) : (
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: `radial-gradient(ellipse at 40% 30%, ${viewingStory.color} 0%, oklch(0.08 0.04 280) 70%)`,
+                }}
+              />
+            )}
+
+            {/* Dark overlay for text legibility */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(to bottom, oklch(0 0 0 / 0.4) 0%, transparent 30%, transparent 60%, oklch(0 0 0 / 0.6) 100%)",
+              }}
+            />
+
+            {/* Top info */}
+            <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 pt-8">
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+                  style={{
+                    background: viewingStory.color,
+                    color: "oklch(0.98 0 0)",
+                  }}
+                >
+                  {viewingStory.username[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <p
+                    className="text-sm font-semibold"
+                    style={{ color: "oklch(0.98 0 0)" }}
+                  >
+                    {viewingStory.username}
+                  </p>
+                  <p
+                    className="text-xs"
+                    style={{ color: "oklch(0.8 0 0 / 0.7)" }}
+                  >
+                    {timeAgo(viewingStory.timestamp)}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                data-ocid="story.close_button"
+                onClick={closeStory}
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
+                style={{
+                  background: "oklch(0 0 0 / 0.4)",
+                  color: "oklch(0.98 0 0)",
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Story text */}
+            {viewingStory.text && (
+              <div className="absolute bottom-0 left-0 right-0 z-10 px-5 pb-8">
+                <p
+                  className="text-base leading-relaxed font-medium text-center"
+                  style={{
+                    color: "oklch(0.97 0 0)",
+                    textShadow: "0 2px 12px oklch(0 0 0 / 0.6)",
+                  }}
+                >
+                  {viewingStory.text}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Add Story Modal */}
+      {showAddStory && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          style={{ background: "oklch(0 0 0 / 0.7)" }}
+          onClick={() => setShowAddStory(false)}
+          onKeyDown={(e) => e.key === "Escape" && setShowAddStory(false)}
+        >
+          <div
+            data-ocid="story.dialog"
+            className="w-full max-w-sm mx-4 mb-4 sm:mb-0 rounded-3xl p-6"
+            style={{
+              background: "oklch(0.12 0.04 275)",
+              border: "1px solid oklch(0.65 0.28 305 / 0.3)",
+              boxShadow: "0 0 40px oklch(0.65 0.28 305 / 0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h3
+                className="font-bold text-base"
+                style={{ color: "oklch(0.88 0.06 280)" }}
+              >
+                Add Your Story
+              </h3>
+              <button
+                type="button"
+                data-ocid="story.close_button"
+                onClick={() => setShowAddStory(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center"
+                style={{
+                  background: "oklch(0.18 0.04 275)",
+                  color: "oklch(0.6 0.06 280)",
+                }}
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <textarea
+              data-ocid="story.textarea"
+              value={storyText}
+              onChange={(e) => setStoryText(e.target.value)}
+              placeholder="What's on your mind? Share a moment..."
+              rows={4}
+              className="w-full resize-none rounded-xl px-4 py-3 text-sm outline-none mb-4"
+              style={{
+                background: "oklch(0.16 0.04 275)",
+                border: "1px solid oklch(0.28 0.06 280 / 0.6)",
+                color: "oklch(0.85 0.04 280)",
+                caretColor: "oklch(0.78 0.15 85)",
+              }}
+            />
+
+            {storyMedia && (
+              <div
+                className="mb-4 rounded-xl overflow-hidden"
+                style={{ border: "1px solid oklch(0.22 0.06 280 / 0.4)" }}
+              >
+                <img
+                  src={storyMedia}
+                  alt="story preview"
+                  className="w-full max-h-40 object-cover"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+              <input
+                ref={storyFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleStoryFile}
+                id="story-upload"
+              />
+              <label
+                htmlFor="story-upload"
+                data-ocid="story.upload_button"
+                className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium cursor-pointer transition-all duration-200"
+                style={{
+                  background: "oklch(0.16 0.05 280)",
+                  border: "1px solid oklch(0.55 0.15 250 / 0.4)",
+                  color: "oklch(0.72 0.2 200)",
+                }}
+              >
+                <Camera size={13} /> Add Photo
+              </label>
+
+              <button
+                type="button"
+                data-ocid="story.submit_button"
+                onClick={handleAddStory}
+                disabled={!storyText.trim() && !storyMedia}
+                className="flex-1 flex items-center justify-center gap-2 py-2 rounded-full text-sm font-bold transition-all duration-200 disabled:opacity-40"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.65 0.28 305), oklch(0.7 0.28 330))",
+                  color: "oklch(0.98 0 0)",
+                  boxShadow: "0 0 16px oklch(0.65 0.28 305 / 0.4)",
+                }}
+              >
+                Post Story
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Instagram-style Bottom Nav */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around py-3 pb-safe"
+        style={{
+          background: "rgba(5,5,10,0.97)",
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+          backdropFilter: "blur(20px)",
+        }}
+      >
+        {[
+          { id: "home" as const, icon: <Home size={22} />, label: "Home" },
+          { id: "reels" as const, icon: <Play size={22} />, label: "Reels" },
+          { id: "direct" as const, icon: <Send size={22} />, label: "Direct" },
+          {
+            id: "search" as const,
+            icon: <Search size={22} />,
+            label: "Search",
+          },
+          {
+            id: "profile" as const,
+            icon: <User size={22} />,
+            label: "Profile",
+          },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            data-ocid={`social.nav.${tab.id}_tab`}
+            onClick={() => setActiveTab(tab.id)}
+            className="flex flex-col items-center gap-0.5 transition-all"
+            style={{
+              color: activeTab === tab.id ? "white" : "rgba(255,255,255,0.4)",
+              filter:
+                activeTab === tab.id
+                  ? "drop-shadow(0 0 8px rgba(255,255,255,0.5))"
+                  : "none",
+            }}
+          >
+            {tab.id === "profile" ? (
+              <div
+                className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-xs font-bold"
+                style={{
+                  background:
+                    activeTab === tab.id
+                      ? "linear-gradient(135deg, oklch(0.65 0.28 305), oklch(0.78 0.15 85))"
+                      : "rgba(255,255,255,0.2)",
+                  color: "white",
+                  border:
+                    activeTab === tab.id
+                      ? "2px solid white"
+                      : "2px solid transparent",
+                }}
+              >
+                {username[0]?.toUpperCase()}
+              </div>
+            ) : (
+              tab.icon
+            )}
+          </button>
+        ))}
+      </nav>
+
+      {/* Camera Modal (for story/post capture) */}
+      <CameraModal
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onSendPhoto={(dataUrl) => {
+          setMediaPreview(dataUrl);
+          setMediaType("image");
+        }}
+        onGalleryPick={(dataUrl) => {
+          setMediaPreview(dataUrl);
+          setMediaType("image");
+        }}
+        onAddStory={(dataUrl) => {
+          const newStory: Story = {
+            id: nextStoryId.current++,
+            username,
+            text: undefined,
+            mediaUrl: dataUrl,
+            timestamp: new Date(),
+            color: getAvatarColor(username),
+            viewed: false,
+          };
+          setStories((prev) => [newStory, ...prev]);
+        }}
+        videoRef={camera.videoRef}
+        canvasRef={camera.canvasRef}
+        isActive={camera.isActive}
+        isLoading={camera.isLoading}
+        error={camera.error}
+        onStartCamera={camera.startCamera}
+        onStopCamera={camera.stopCamera}
+        onSwitchCamera={camera.switchCamera}
+      />
     </div>
   );
 }

@@ -46,7 +46,11 @@ export default function MatchmakingScreen({
   }, [matchResult, onMatched]);
 
   const handleCancel = async () => {
-    await leaveMutation.mutateAsync(username);
+    try {
+      await leaveMutation.mutateAsync(username);
+    } catch {
+      // ignore errors so cancel always navigates back
+    }
     onCancel();
   };
 
@@ -170,8 +174,8 @@ export default function MatchmakingScreen({
         <button
           type="button"
           data-ocid="matchmaking.secondary_button"
-          onClick={() => {
-            handleCancel();
+          onClick={async () => {
+            await handleCancel();
             onBotChat();
           }}
           className="mt-3 px-8 py-3 rounded-xl font-medium transition-all duration-200 hover:scale-105"

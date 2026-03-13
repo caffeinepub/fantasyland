@@ -5,6 +5,7 @@ import ChatRoom from "./components/ChatRoom";
 import GameRoom from "./components/GameRoom";
 import Lobby from "./components/Lobby";
 import MatchmakingScreen from "./components/MatchmakingScreen";
+import ProfilePage from "./components/ProfilePage";
 import RoleplayRoom from "./components/RoleplayRoom";
 import SocialMediaRoom from "./components/SocialMediaRoom";
 import SplashScreen from "./components/SplashScreen";
@@ -23,7 +24,8 @@ export type Room =
   | { type: "chill" }
   | { type: "game" }
   | { type: "ai-bot" }
-  | { type: "social-media" };
+  | { type: "social-media" }
+  | { type: "profile" };
 
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
@@ -157,6 +159,12 @@ export default function App() {
             )}
             {room.type === "social-media" && (
               <SocialMediaRoom
+                username={username}
+                onBack={() => setRoom({ type: "lobby" })}
+              />
+            )}
+            {room.type === "profile" && (
+              <ProfilePage
                 username={username}
                 onBack={() => setRoom({ type: "lobby" })}
               />

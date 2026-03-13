@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { Home, Play, Search, Send, Sparkles, User } from "lucide-react";
 import { useState } from "react";
 import type { Room } from "../App";
 import { useOnlineCount } from "../hooks/useQueries";
@@ -131,6 +131,9 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
   const [showPrivate, setShowPrivate] = useState(false);
   const [showRoleplay, setShowRoleplay] = useState(false);
   const [hoveredRoom, setHoveredRoom] = useState<string | null>(null);
+  const [activeNavTab, setActiveNavTab] = useState<
+    "home" | "reels" | "direct" | "search" | "profile"
+  >("home");
 
   const handleRoomClick = (id: string) => {
     if (id === "private") setShowPrivate(true);
@@ -230,6 +233,28 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
       {/* Main content */}
       <main className="relative z-10 px-6 py-12">
         <div className="max-w-5xl mx-auto">
+          {/* Tagline at top */}
+          <div className="text-center mb-10">
+            <p
+              className="text-lg font-medium mb-1"
+              style={{ color: "oklch(0.78 0.15 85)" }}
+            >
+              Welcome the new world of
+            </p>
+            <h1
+              className="font-display text-4xl sm:text-5xl font-black tracking-widest uppercase"
+              style={{
+                background:
+                  "linear-gradient(135deg, oklch(0.92 0.04 280) 0%, oklch(0.78 0.15 85) 40%, oklch(0.85 0.28 305) 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              FANTASY
+            </h1>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {rooms.map((room, idx) => {
               const isHovered = hoveredRoom === room.id;
@@ -309,28 +334,6 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
               );
             })}
           </div>
-
-          {/* Tagline at bottom */}
-          <div className="text-center mt-16 mb-4">
-            <p
-              className="text-lg font-medium mb-1"
-              style={{ color: "oklch(0.78 0.15 85)" }}
-            >
-              Welcome the new world of
-            </p>
-            <h1
-              className="font-display text-4xl sm:text-5xl font-black tracking-widest uppercase"
-              style={{
-                background:
-                  "linear-gradient(135deg, oklch(0.92 0.04 280) 0%, oklch(0.78 0.15 85) 40%, oklch(0.85 0.28 305) 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              FANTASY
-            </h1>
-          </div>
         </div>
       </main>
 
@@ -348,6 +351,73 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
           caffeine.ai
         </a>
       </footer>
+
+      {/* Instagram-style Bottom Nav */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around py-3 pb-safe"
+        style={{
+          background: "rgba(5,5,10,0.97)",
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+          backdropFilter: "blur(20px)",
+        }}
+      >
+        {[
+          { id: "home" as const, icon: <Home size={22} />, label: "Home" },
+          { id: "reels" as const, icon: <Play size={22} />, label: "Reels" },
+          { id: "direct" as const, icon: <Send size={22} />, label: "Direct" },
+          {
+            id: "search" as const,
+            icon: <Search size={22} />,
+            label: "Search",
+          },
+          {
+            id: "profile" as const,
+            icon: <User size={22} />,
+            label: "Profile",
+          },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            data-ocid={`lobby.nav.${tab.id}_tab`}
+            onClick={() => {
+              setActiveNavTab(tab.id);
+              if (tab.id === "reels") onEnterRoom({ type: "social-media" });
+              if (tab.id === "profile") onEnterRoom({ type: "profile" });
+            }}
+            className="flex flex-col items-center gap-0.5 transition-all active:scale-90"
+            style={{
+              color:
+                activeNavTab === tab.id ? "white" : "rgba(255,255,255,0.4)",
+              filter:
+                activeNavTab === tab.id
+                  ? "drop-shadow(0 0 8px rgba(255,255,255,0.5))"
+                  : "none",
+            }}
+          >
+            {tab.id === "profile" ? (
+              <div
+                className="w-[22px] h-[22px] rounded-full flex items-center justify-center text-xs font-bold"
+                style={{
+                  background:
+                    activeNavTab === tab.id
+                      ? "linear-gradient(135deg, oklch(0.65 0.28 305), oklch(0.78 0.15 85))"
+                      : "rgba(255,255,255,0.2)",
+                  color: "white",
+                  border:
+                    activeNavTab === tab.id
+                      ? "2px solid white"
+                      : "2px solid transparent",
+                }}
+              >
+                {username[0]?.toUpperCase()}
+              </div>
+            ) : (
+              tab.icon
+            )}
+          </button>
+        ))}
+      </nav>
 
       {showPrivate && (
         <PrivateRoomModal

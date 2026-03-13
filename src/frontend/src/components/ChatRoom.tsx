@@ -23,6 +23,7 @@ import {
   useOnlineUsers,
   useSendMessage,
 } from "../hooks/useQueries";
+import CameraModal from "./CameraModal";
 import NumberGuess from "./NumberGuess";
 import RPSGame from "./RPSGame";
 import TicTacToe from "./TicTacToe";
@@ -289,7 +290,6 @@ export default function ChatRoom({
   const onlineUsers = isAiBot ? [username, "FantasyBot"] : backendOnlineUsers;
   const qc = useQueryClient();
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
   useEffect(() => {
     if (!isAiBot) return;
     setBotMessages([
@@ -332,20 +332,6 @@ export default function ChatRoom({
       if (mediaPreview?.url) URL.revokeObjectURL(mediaPreview.url);
     };
   }, [mediaPreview]);
-
-  const handleCapturePhoto = async () => {
-    const file = await camera.capturePhoto();
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        setMediaPreview({ url: dataUrl, type: file.type });
-      };
-      reader.readAsDataURL(file);
-      setShowCameraModal(false);
-      camera.stopCamera();
-    }
-  };
 
   const handleSend = async () => {
     const trimmed = text.trim();
@@ -1145,164 +1131,28 @@ export default function ChatRoom({
       </AnimatePresence>
 
       {/* Camera Modal */}
-      <AnimatePresence>
-        {showCameraModal && (
-          <motion.div
-            data-ocid="camera.modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{
-              background: "oklch(0 0 0 / 0.8)",
-              backdropFilter: "blur(8px)",
-            }}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full max-w-sm rounded-3xl p-5 flex flex-col gap-4"
-              style={{
-                background:
-                  "linear-gradient(145deg, oklch(0.13 0.06 285), oklch(0.09 0.04 270))",
-                border: "1px solid oklch(0.72 0.18 220 / 0.4)",
-                boxShadow: "0 0 60px oklch(0.72 0.18 220 / 0.2)",
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <h3
-                  className="font-display text-xl font-black"
-                  style={{ color: "oklch(0.92 0.04 280)" }}
-                >
-                  📸 Camera
-                </h3>
-                <button
-                  type="button"
-                  data-ocid="camera.close_button"
-                  onClick={() => {
-                    setShowCameraModal(false);
-                    camera.stopCamera();
-                  }}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all hover:scale-110"
-                  style={{
-                    background: "oklch(0.16 0.05 280)",
-                    border: "1px solid oklch(0.28 0.08 280 / 0.6)",
-                    color: "oklch(0.7 0.06 280)",
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* Video preview */}
-              <div
-                className="relative rounded-2xl overflow-hidden"
-                style={{
-                  background: "oklch(0.1 0.03 280)",
-                  border: "1px solid oklch(0.22 0.06 280 / 0.4)",
-                  height: "200px",
-                }}
-              >
-                <video
-                  ref={camera.videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                  style={{ display: camera.isActive ? "block" : "none" }}
-                />
-                {!camera.isActive && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="text-4xl mb-2">📷</div>
-                      <p
-                        className="text-sm"
-                        style={{ color: "oklch(0.55 0.06 280)" }}
-                      >
-                        {camera.isLoading ? "Starting camera..." : "Camera off"}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {camera.isLoading && (
-                  <div
-                    className="absolute inset-0 flex items-center justify-center"
-                    data-ocid="camera.loading_state"
-                  >
-                    <div
-                      className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-                      style={{ borderColor: "oklch(0.72 0.18 220)" }}
-                    />
-                  </div>
-                )}
-              </div>
-              <canvas ref={camera.canvasRef} className="hidden" />
-
-              {/* Error */}
-              {camera.error && (
-                <p
-                  className="text-sm text-center"
-                  data-ocid="camera.error_state"
-                  style={{ color: "oklch(0.65 0.22 25)" }}
-                >
-                  ⚠️ {camera.error.message}
-                </p>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-2">
-                {!camera.isActive && !camera.isLoading && (
-                  <button
-                    type="button"
-                    data-ocid="camera.button"
-                    onClick={() => camera.startCamera()}
-                    className="flex-1 py-2.5 rounded-2xl font-bold text-sm transition-all hover:scale-105"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, oklch(0.55 0.22 220), oklch(0.5 0.2 200))",
-                      color: "oklch(0.97 0.02 280)",
-                    }}
-                  >
-                    Start Camera
-                  </button>
-                )}
-                {camera.isActive && (
-                  <>
-                    <button
-                      type="button"
-                      data-ocid="camera.primary_button"
-                      onClick={handleCapturePhoto}
-                      className="flex-1 py-2.5 rounded-2xl font-bold text-sm transition-all hover:scale-105"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, oklch(0.65 0.28 305), oklch(0.6 0.25 250))",
-                        color: "oklch(0.97 0.02 280)",
-                        boxShadow: "0 0 20px oklch(0.65 0.28 305 / 0.4)",
-                      }}
-                    >
-                      📸 Capture
-                    </button>
-                    <button
-                      type="button"
-                      data-ocid="camera.toggle"
-                      onClick={() => camera.switchCamera()}
-                      className="px-4 py-2.5 rounded-2xl font-bold text-sm transition-all hover:scale-105 sm:hidden"
-                      style={{
-                        background: "oklch(0.17 0.06 280)",
-                        border: "1px solid oklch(0.28 0.08 280 / 0.6)",
-                        color: "oklch(0.75 0.06 280)",
-                      }}
-                    >
-                      🔄
-                    </button>
-                  </>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <CameraModal
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onSendPhoto={(dataUrl) => {
+          setMediaPreview({ url: dataUrl, type: "image/jpeg" });
+        }}
+        onGalleryPick={(dataUrl) => {
+          setMediaPreview({ url: dataUrl, type: "image/jpeg" });
+        }}
+        onSendReel={(videoBlob) => {
+          const url = URL.createObjectURL(videoBlob);
+          setMediaPreview({ url, type: "video/webm" });
+        }}
+        videoRef={camera.videoRef}
+        canvasRef={camera.canvasRef}
+        isActive={camera.isActive}
+        isLoading={camera.isLoading}
+        error={camera.error}
+        onStartCamera={camera.startCamera}
+        onStopCamera={camera.stopCamera}
+        onSwitchCamera={camera.switchCamera}
+      />
 
       {/* Online Members Panel */}
       <AnimatePresence>
