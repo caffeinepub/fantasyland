@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import Logo3D from "./Logo3D";
 
 interface Props {
   onDone: () => void;
@@ -189,21 +188,11 @@ export default function SplashScreen({ onDone }: Props) {
         }}
       />
 
-      <div
-        className="mb-6 relative z-10"
-        style={{
-          opacity: visibleLetters > 0 ? 1 : 0,
-          transition: "opacity 0.6s ease",
-        }}
-      >
-        <Logo3D size={96} />
-      </div>
-
-      <div className="relative z-10 flex items-end gap-0">
+      <div className="relative z-10 flex items-end gap-0 mt-4">
         {LETTERS_WITH_KEYS.map(({ char, key }, i) => (
           <span
             key={key}
-            className="font-display text-6xl sm:text-7xl md:text-8xl font-black tracking-wide"
+            className="font-display text-4xl sm:text-5xl font-black tracking-wide"
             style={{
               opacity: visibleLetters > i ? 1 : 0,
               transform:
@@ -238,7 +227,7 @@ export default function SplashScreen({ onDone }: Props) {
           textShadow: "0 0 20px oklch(0.78 0.15 85 / 0.6)",
         }}
       >
-        Welcome the world of fantasy
+        Welcome the new world of fantasy
       </div>
 
       <div

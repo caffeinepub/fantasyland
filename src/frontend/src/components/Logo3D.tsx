@@ -18,7 +18,6 @@ export default function Logo3D({ size = 96, className = "" }: Props) {
       const rect = el.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      // Normalize to -1..1 based on distance from center
       const dx = (e.clientX - cx) / (window.innerWidth / 2);
       const dy = (e.clientY - cy) / (window.innerHeight / 2);
       setTilt({ x: dy * -18, y: dx * 18 });
@@ -34,13 +33,8 @@ export default function Logo3D({ size = 96, className = "" }: Props) {
     <div
       ref={containerRef}
       className={`relative flex items-center justify-center ${className}`}
-      style={{
-        width: size,
-        height: size,
-        perspective: "800px",
-      }}
+      style={{ width: size, height: size, perspective: "800px" }}
     >
-      {/* Glow reflection that moves with tilt */}
       <div
         className="absolute rounded-full pointer-events-none"
         style={{
@@ -56,30 +50,17 @@ export default function Logo3D({ size = 96, className = "" }: Props) {
         }}
       />
 
-      {/* 3D logo wrapper */}
       <motion.div
         className="relative"
-        style={{
-          transformStyle: "preserve-3d",
-          width: size,
-          height: size,
-        }}
-        animate={{
-          rotateX: tilt.x,
-          rotateY: tilt.y,
-          y: isHovered ? -6 : 0,
-        }}
+        style={{ transformStyle: "preserve-3d", width: size, height: size }}
+        animate={{ rotateX: tilt.x, rotateY: tilt.y, y: isHovered ? -6 : 0 }}
         transition={{ type: "spring", stiffness: 120, damping: 18, mass: 0.6 }}
         onHoverStart={() => setIsHovered(true)}
         onHoverEnd={() => setIsHovered(false)}
       >
-        {/* Continuous float + slow spin */}
         <motion.div
           style={{ transformStyle: "preserve-3d", width: size, height: size }}
-          animate={{
-            y: [0, -8, 0],
-            rotateY: [0, 360],
-          }}
+          animate={{ y: [0, -8, 0], rotateY: [0, 360] }}
           transition={{
             y: {
               duration: 3.5,
@@ -94,7 +75,7 @@ export default function Logo3D({ size = 96, className = "" }: Props) {
           }}
         >
           <img
-            src="/assets/uploads/1773309582834-1-1.png"
+            src="/assets/uploads/IMG_20260313_054953-1-1.png"
             alt="FantasyLand"
             width={size}
             height={size}
@@ -109,7 +90,6 @@ export default function Logo3D({ size = 96, className = "" }: Props) {
         </motion.div>
       </motion.div>
 
-      {/* Shadow beneath */}
       <div
         className="absolute pointer-events-none"
         style={{

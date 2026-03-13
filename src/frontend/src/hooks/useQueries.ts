@@ -10,7 +10,9 @@ export function useMessages(roomId: string) {
       return actor.getMessages(roomId);
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: 3000,
+    refetchInterval: 600,
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 
@@ -71,7 +73,7 @@ export function useOnlineUsers(roomId: string) {
       return (actor as any).getOnlineUsers(roomId) as Promise<string[]>;
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: 15000,
+    refetchInterval: 6000,
   });
 }
 
@@ -104,7 +106,7 @@ export function useGetMatchResult(username: string, enabled: boolean) {
       return (actor as any).getMatchResult(username) as Promise<string | null>;
     },
     enabled: !!actor && !isFetching && enabled,
-    refetchInterval: enabled ? 2000 : false,
+    refetchInterval: enabled ? 800 : false,
   });
 }
 
@@ -163,6 +165,6 @@ export function useRPSGame(gameId: string | null, active: boolean) {
       return result;
     },
     enabled: !!actor && !isFetching && !!gameId && active,
-    refetchInterval: active ? 2000 : false,
+    refetchInterval: active ? 800 : false,
   });
 }

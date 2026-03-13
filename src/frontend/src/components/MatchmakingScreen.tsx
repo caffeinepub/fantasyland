@@ -11,12 +11,14 @@ interface Props {
   username: string;
   onMatched: (roomId: string) => void;
   onCancel: () => void;
+  onBotChat?: () => void;
 }
 
 export default function MatchmakingScreen({
   username,
   onMatched,
   onCancel,
+  onBotChat,
 }: Props) {
   const joinMutation = useJoinMatchmaking();
   const leaveMutation = useLeaveMatchmaking();
@@ -163,6 +165,28 @@ export default function MatchmakingScreen({
       >
         Cancel
       </Button>
+
+      {onBotChat && (
+        <button
+          type="button"
+          data-ocid="matchmaking.secondary_button"
+          onClick={() => {
+            handleCancel();
+            onBotChat();
+          }}
+          className="mt-3 px-8 py-3 rounded-xl font-medium transition-all duration-200 hover:scale-105"
+          style={{
+            background:
+              "linear-gradient(135deg, oklch(0.45 0.18 175), oklch(0.5 0.2 200))",
+            border: "1px solid oklch(0.6 0.2 175 / 0.5)",
+            color: "oklch(0.95 0.03 160)",
+            cursor: "pointer",
+            boxShadow: "0 0 20px oklch(0.45 0.18 175 / 0.3)",
+          }}
+        >
+          🤖 Chat with AI Bot
+        </button>
+      )}
     </div>
   );
 }

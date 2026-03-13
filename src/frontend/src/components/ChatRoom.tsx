@@ -4,15 +4,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
-  ChevronRight,
+  Camera,
+  Gamepad2,
   Paperclip,
   Pencil,
+  Smile,
   Sparkles,
   Users,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { useCamera } from "../camera/useCamera";
 import { usePresence } from "../hooks/usePresence";
 import {
   useJoinRPSGame,
@@ -20,7 +23,9 @@ import {
   useOnlineUsers,
   useSendMessage,
 } from "../hooks/useQueries";
+import NumberGuess from "./NumberGuess";
 import RPSGame from "./RPSGame";
+import TicTacToe from "./TicTacToe";
 import UsernameTopBar from "./UsernameTopBar";
 
 interface Props {
@@ -61,13 +66,166 @@ function getUserColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+const EMOJIS = [
+  "😀",
+  "😂",
+  "😄",
+  "😆",
+  "😉",
+  "😍",
+  "😘",
+  "😜",
+  "🤣",
+  "🥰",
+  "😱",
+  "😢",
+  "😡",
+  "🤔",
+  "😎",
+  "🤓",
+  "❤️",
+  "💕",
+  "💖",
+  "💜",
+  "💛",
+  "💚",
+  "💙",
+  "👍",
+  "👎",
+  "👏",
+  "🙌",
+  "👋",
+  "✌️",
+  "🤞",
+  "💪",
+  "🎉",
+  "🔥",
+  "⭐",
+  "🌟",
+  "⚡",
+  "🌈",
+  "🦄",
+  "🐉",
+  "🐶",
+];
+
+// AI Bot responses
+function getBotReply(msg: string): string {
+  const m = msg.toLowerCase();
+  const greetings = [
+    "Hey there! 👋 Great to chat with you!",
+    "Hello! I'm FantasyBot 🤖, your AI companion!",
+    "Hi! Ready for a fun conversation? 😄",
+    "Hey! What's on your mind?",
+  ];
+  const howAreYou = [
+    "I'm doing fantastic, thanks for asking! 🌟",
+    "Feeling electric today! ⚡ How about you?",
+    "Running at full power! 💫 And you?",
+    "Couldn't be better! 🎉 What about yourself?",
+  ];
+  const jokes = [
+    "Why don't scientists trust atoms? Because they make up everything! 😂",
+    "I told my computer I needed a break. Now it won't stop sending me Kit-Kat ads! 🍫",
+    "Why do programmers prefer dark mode? Because light attracts bugs! 🐛",
+    "What do you call a fake noodle? An impasta! 🍝",
+    "Why did the scarecrow win an award? He was outstanding in his field! 🌾",
+  ];
+  const facts = [
+    "🌟 Did you know honey never spoils? Archaeologists found 3000-year-old honey in Egyptian tombs!",
+    "🐙 Octopuses have 3 hearts and blue blood!",
+    "🌍 A day on Venus is longer than a year on Venus!",
+    "🦋 Butterflies taste with their feet!",
+    "⚡ Lightning strikes Earth about 100 times per second!",
+  ];
+  const riddles = [
+    "🧩 I have cities, but no houses live there. Mountains, but no trees. Water, but no fish. What am I? (A map!)",
+    "🤔 What has hands but can't clap? (A clock!)",
+    "💡 The more you take, the more you leave behind. What am I? (Footsteps!)",
+  ];
+  const motivational = [
+    "You're capable of amazing things! Keep going! 💪",
+    "Every expert was once a beginner. Keep learning! 🌱",
+    "Your potential is limitless! ✨",
+    "Dream big, work hard, stay focused! 🎯",
+  ];
+  const compliments = [
+    "You seem really cool to talk to! 😎",
+    "I love your curiosity! 🌟",
+    "You ask great questions!",
+    "You've got great energy! ⚡",
+  ];
+  const bored = [
+    "Let's play a game! Ask me a riddle 🧩 or tell me to share a fun fact!",
+    "We could chat about anything! Ask me for a joke or a fun fact 😄",
+    "How about I tell you something interesting? Ask me for a fun fact!",
+  ];
+  const age = [
+    "I'm an AI, so technically I'm always the age I was created! 🤖",
+    "Age is just a number for humans — for bots, it's just a version number! 😄",
+  ];
+  const location = [
+    "I exist everywhere on the internet! 🌐 I'm in the cloud ☁️",
+    "I'm wherever you need me to be! 🌍",
+  ];
+  const name = [
+    "I'm FantasyBot 🤖 — your AI chat companion in FantasyLand!",
+    "Call me FantasyBot! Here to chat, joke, and share fun facts 🌟",
+  ];
+  const random = [
+    "That's interesting! Tell me more 🤔",
+    "Cool! What else is on your mind? 💭",
+    "I like where this is going! 😄",
+    "Fascinating! 🌟",
+    "Ha! That made me smile 😊",
+    "You're keeping me on my toes! ⚡",
+    "Love that energy! 🔥",
+    "Tell me more!",
+    "Interesting perspective! 🧠",
+    "That's awesome! 🎉",
+  ];
+
+  const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+
+  if (m.match(/\b(hi|hello|hey|sup|yo|howdy)\b/)) return pick(greetings);
+  if (
+    m.match(/how are you|how r u|how do you feel|how's it going|hows it going/)
+  )
+    return pick(howAreYou);
+  if (m.match(/joke|funny|laugh|lol|haha/)) return pick(jokes);
+  if (m.match(/fact|did you know|tell me something|interesting/))
+    return pick(facts);
+  if (m.match(/riddle|puzzle|brain/)) return pick(riddles);
+  if (m.match(/motivat|inspire|encourage|sad|depress|down/))
+    return pick(motivational);
+  if (m.match(/compliment|nice|beautiful|pretty|handsome|smart/))
+    return pick(compliments);
+  if (m.match(/bore|bored|boring|nothing to do/)) return pick(bored);
+  if (m.match(/\bage\b|how old|years old/)) return pick(age);
+  if (m.match(/where are you|location|from|country|city/))
+    return pick(location);
+  if (m.match(/your name|who are you|what are you|what is your name/))
+    return pick(name);
+  if (m.match(/bye|goodbye|cya|see you|later/))
+    return "Goodbye! Come chat anytime 👋🌟";
+  if (m.match(/thank|thanks|thx/))
+    return "You're welcome! Always happy to help 😊✨";
+  if (m.match(/love|like you|you're great/))
+    return "Aww, you're making me blush! 🤖❤️";
+  if (m.match(/game|play|challenge/))
+    return "I'd love to play! Check out the games menu in the chat bar 🎮";
+  if (m.match(/help|what can you do/))
+    return "I can chat, tell jokes 😂, share fun facts 🌟, give riddles 🧩, motivate you 💪, and more! Just talk to me!";
+  return pick(random);
+}
+
 export default function ChatRoom({
   roomId,
   roomName,
   roomEmoji,
   username,
   onBack,
-  onRename,
+  onRename: _onRename,
   extraPanel,
 }: Props) {
   const [text, setText] = useState("");
@@ -93,18 +251,58 @@ export default function ChatRoom({
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Games menu & active game
+  const [showGamesMenu, setShowGamesMenu] = useState(false);
+  const [activeGame, setActiveGame] = useState<"rps" | "ttt" | "ng" | null>(
+    null,
+  );
+
+  // Emoji picker
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  // Camera modal
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const camera = useCamera({ facingMode: "user", format: "image/jpeg" });
+
+  // AI Bot mode
+  const isAiBot = roomId.startsWith("ai-bot-");
+  const [botMessages, setBotMessages] = useState<
+    Array<{ username: string; text: string; timestamp: bigint; key: string }>
+  >([]);
+  const [botTyping, setBotTyping] = useState(false);
+
   // Optimistic messages
   const [optimisticMessages, setOptimisticMessages] = useState<
     Array<{ username: string; text: string; timestamp: bigint; key: string }>
   >([]);
 
-  const { data: messages = [], isLoading } = useMessages(roomId);
+  const { data: backendMessages = [], isLoading: backendLoading } = useMessages(
+    isAiBot ? "__disabled__" : roomId,
+  );
+  const messages = isAiBot ? botMessages : backendMessages;
+  const isLoading = isAiBot ? false : backendLoading;
   const sendMutation = useSendMessage(roomId);
   const joinRPS = useJoinRPSGame();
-  const { data: onlineUsers = [] } = useOnlineUsers(roomId);
+  const { data: backendOnlineUsers = [] } = useOnlineUsers(
+    isAiBot ? "__disabled__" : roomId,
+  );
+  const onlineUsers = isAiBot ? [username, "FantasyBot"] : backendOnlineUsers;
   const qc = useQueryClient();
 
-  usePresence(roomId, username);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
+  useEffect(() => {
+    if (!isAiBot) return;
+    setBotMessages([
+      {
+        username: "FantasyBot 🤖",
+        text: "Hey there! 👋 I'm FantasyBot, your AI companion! Ask me anything — jokes, facts, riddles, or just chat!",
+        timestamp: BigInt(Date.now() * 1_000_000),
+        key: "bot-welcome",
+      },
+    ]);
+  }, [isAiBot]);
+
+  usePresence(isAiBot ? "" : roomId, username);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scrollRef is stable
   useEffect(() => {
@@ -113,12 +311,18 @@ export default function ChatRoom({
     }
   }, [messages, optimisticMessages]);
 
+  // Stop camera when modal closes
+  useEffect(() => {
+    if (!showCameraModal && camera.isActive) {
+      camera.stopCamera();
+    }
+  }, [showCameraModal, camera.isActive, camera.stopCamera]);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
     setMediaPreview({ url, type: file.type });
-    // reset file input
     e.target.value = "";
   };
 
@@ -129,10 +333,51 @@ export default function ChatRoom({
     };
   }, [mediaPreview]);
 
+  const handleCapturePhoto = async () => {
+    const file = await camera.capturePhoto();
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setMediaPreview({ url: dataUrl, type: file.type });
+      };
+      reader.readAsDataURL(file);
+      setShowCameraModal(false);
+      camera.stopCamera();
+    }
+  };
+
   const handleSend = async () => {
     const trimmed = text.trim();
     if (!trimmed && !mediaPreview) return;
     if (isSending) return;
+
+    // AI Bot mode: local messages + auto reply
+    if (isAiBot) {
+      const userMsg = {
+        username,
+        text: trimmed,
+        timestamp: BigInt(Date.now() * 1_000_000),
+        key: `user-${Date.now()}`,
+      };
+      setText("");
+      setMediaPreview(null);
+      setBotMessages((prev) => [...prev, userMsg]);
+      setBotTyping(true);
+      const delay = 800 + Math.random() * 700;
+      setTimeout(() => {
+        const botReply = getBotReply(trimmed);
+        const botMsg = {
+          username: "FantasyBot 🤖",
+          text: botReply,
+          timestamp: BigInt(Date.now() * 1_000_000),
+          key: `bot-${Date.now()}`,
+        };
+        setBotMessages((prev) => [...prev, botMsg]);
+        setBotTyping(false);
+      }, delay);
+      return;
+    }
 
     // Intercept /joingame command
     const joinMatch = trimmed.match(/^\/joingame\s+(\S+)/);
@@ -211,6 +456,16 @@ export default function ChatRoom({
     setEditText("");
   };
 
+  const handleChallenge = async (type: "rps" | "ttt" | "ng") => {
+    const msgs = {
+      rps: `🎮 ${username} challenges the room to Rock Paper Scissors! Type /joingame [gameId] after they start a game to join!`,
+      ttt: `🎲 ${username} challenges you to Tic Tac Toe! First to reply /accept plays!`,
+      ng: `🔢 ${username} challenges the room to Number Guess! Join the game zone to play!`,
+    };
+    await handleSendSystemMessage(msgs[type]);
+    setShowGamesMenu(false);
+  };
+
   return (
     <div
       className="relative flex h-screen overflow-hidden"
@@ -230,9 +485,8 @@ export default function ChatRoom({
         }}
       />
 
-      {onRename && <UsernameTopBar username={username} onRename={onRename} />}
       {/* Main chat area */}
-      <div className="relative z-10 flex flex-col flex-1 min-w-0 pt-10">
+      <div className="relative z-10 flex flex-col flex-1 min-w-0">
         <header
           className="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0"
           style={{
@@ -268,7 +522,7 @@ export default function ChatRoom({
             </div>
           </div>
 
-          {/* Right side: online count + RPS + members toggle */}
+          {/* Right side */}
           <div className="ml-auto flex items-center gap-3">
             <RPSGame
               roomId={roomId}
@@ -416,29 +670,13 @@ export default function ChatRoom({
                       <button
                         type="button"
                         onClick={() => handleSaveEdit(msgKey)}
-                        className="text-xs px-2 py-1 rounded-lg"
+                        className="px-2 py-1 rounded-lg text-xs font-bold"
                         style={{
-                          background: "oklch(0.65 0.28 305 / 0.3)",
-                          color: "oklch(0.9 0.1 305)",
-                          border: "1px solid oklch(0.65 0.28 305 / 0.5)",
+                          background: "oklch(0.65 0.28 305)",
+                          color: "oklch(0.97 0.02 280)",
                         }}
                       >
-                        ✓
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingId(null);
-                          setEditText("");
-                        }}
-                        className="text-xs px-2 py-1 rounded-lg"
-                        style={{
-                          background: "oklch(0.2 0.04 280)",
-                          color: "oklch(0.6 0.05 280)",
-                          border: "1px solid oklch(0.3 0.06 280 / 0.5)",
-                        }}
-                      >
-                        ✕
+                        Save
                       </button>
                     </div>
                   ) : (
@@ -446,13 +684,11 @@ export default function ChatRoom({
                       className="px-4 py-2 rounded-2xl text-sm leading-relaxed"
                       style={{
                         background: isOwn
-                          ? "linear-gradient(135deg, oklch(0.65 0.28 305 / 0.3), oklch(0.6 0.25 250 / 0.3))"
-                          : "oklch(0.14 0.04 275)",
-                        border: `1px solid ${
-                          isOwn
-                            ? "oklch(0.65 0.28 305 / 0.4)"
-                            : "oklch(0.22 0.06 280 / 0.5)"
-                        }`,
+                          ? "linear-gradient(135deg, oklch(0.65 0.28 305 / 0.25), oklch(0.6 0.25 250 / 0.25))"
+                          : "oklch(0.14 0.04 275 / 0.8)",
+                        border: isOwn
+                          ? "1px solid oklch(0.65 0.28 305 / 0.4)"
+                          : "1px solid oklch(0.22 0.06 280 / 0.4)",
                         color: "oklch(0.9 0.03 280)",
                         borderRadius: isOwn
                           ? "18px 18px 4px 18px"
@@ -464,25 +700,26 @@ export default function ChatRoom({
                       {displayText}
                     </div>
                   )}
-                  <span
-                    className="text-xs"
-                    style={{ color: "oklch(0.4 0.04 280)" }}
-                  >
-                    {formatTime(msg.timestamp)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-xs"
+                      style={{ color: "oklch(0.4 0.04 280)" }}
+                    >
+                      {formatTime(msg.timestamp)}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Hover action buttons */}
+                {/* Hover actions */}
                 <div
-                  className={`absolute top-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ${
-                    isOwn ? "left-10" : "right-0"
+                  className={`absolute top-0 opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity ${
+                    isOwn ? "left-0" : "right-0"
                   }`}
                 >
-                  {/* Reply button */}
                   <button
                     type="button"
                     onClick={() =>
-                      setReplyTo({ username: msg.username, text: msg.text })
+                      setReplyTo({ username: msg.username, text: displayText })
                     }
                     className="px-2 py-0.5 rounded-lg text-xs"
                     style={{
@@ -494,7 +731,6 @@ export default function ChatRoom({
                   >
                     ↩
                   </button>
-                  {/* Edit button — own messages only */}
                   {isOwn && !isEditing && (
                     <button
                       type="button"
@@ -518,6 +754,34 @@ export default function ChatRoom({
             );
           })}
 
+          {/* Bot typing indicator */}
+          {isAiBot && botTyping && (
+            <div className="flex items-end gap-2 mb-2">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.45 0.18 175), oklch(0.5 0.2 200))",
+                }}
+              >
+                🤖
+              </div>
+              <div
+                className="px-4 py-2 rounded-2xl rounded-bl-sm"
+                style={{
+                  background: "oklch(0.18 0.04 275)",
+                  border: "1px solid oklch(0.35 0.1 280 / 0.4)",
+                }}
+              >
+                <span
+                  className="text-sm"
+                  style={{ color: "oklch(0.65 0.08 280)" }}
+                >
+                  typing...
+                </span>
+              </div>
+            </div>
+          )}
           {/* Optimistic messages */}
           {optimisticMessages.map((msg) => {
             const color = getUserColor(msg.username);
@@ -599,7 +863,8 @@ export default function ChatRoom({
               <button
                 type="button"
                 onClick={() => setReplyTo(null)}
-                style={{ marginLeft: "auto", color: "oklch(0.5 0.05 280)" }}
+                className="ml-auto"
+                style={{ color: "oklch(0.55 0.06 280)" }}
               >
                 ✕
               </button>
@@ -608,47 +873,256 @@ export default function ChatRoom({
 
           {/* Media preview */}
           {mediaPreview && (
-            <div
-              className="flex items-center gap-2 mb-2 p-2 rounded-lg"
-              style={{
-                background: "oklch(0.14 0.04 275)",
-                border: "1px solid oklch(0.65 0.28 305 / 0.3)",
-              }}
-            >
+            <div className="mb-2 relative inline-block">
               {mediaPreview.type.startsWith("video/") ? (
-                // biome-ignore lint/a11y/useMediaCaption: preview only
                 <video
                   src={mediaPreview.url}
-                  className="h-16 rounded-lg object-cover"
-                  style={{ maxWidth: "120px" }}
-                />
+                  className="h-24 rounded-xl object-cover"
+                >
+                  <track kind="captions" />
+                </video>
               ) : (
                 <img
                   src={mediaPreview.url}
                   alt="preview"
-                  className="h-16 rounded-lg object-cover"
-                  style={{ maxWidth: "120px" }}
+                  className="h-24 rounded-xl object-cover"
                 />
               )}
-              <span
-                className="text-xs flex-1"
-                style={{ color: "oklch(0.65 0.08 280)" }}
-              >
-                Media ready to send
-              </span>
               <button
                 type="button"
                 onClick={() => setMediaPreview(null)}
-                className="p-1 rounded-lg"
-                style={{ color: "oklch(0.5 0.05 280)" }}
+                className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-xs"
+                style={{
+                  background: "oklch(0.65 0.28 305)",
+                  color: "oklch(0.97 0.02 280)",
+                }}
               >
-                <X size={14} />
+                ✕
               </button>
             </div>
           )}
 
-          <div className="flex gap-2 items-center">
-            {/* Hidden file input */}
+          {/* Input bar */}
+          <div
+            className="relative flex items-center gap-2 px-3 py-2 rounded-full"
+            style={{
+              background: "oklch(0.13 0.04 275)",
+              border: "1px solid oklch(0.22 0.06 280 / 0.6)",
+            }}
+          >
+            {/* Gamepad button */}
+            <div className="relative flex-shrink-0">
+              <button
+                type="button"
+                data-ocid="chat.games.toggle"
+                onClick={() => {
+                  setShowGamesMenu((v) => !v);
+                  setShowEmojiPicker(false);
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                style={{
+                  background: showGamesMenu
+                    ? "oklch(0.55 0.28 305)"
+                    : "oklch(0.45 0.22 305 / 0.8)",
+                  boxShadow: showGamesMenu
+                    ? "0 0 16px oklch(0.65 0.28 305 / 0.6)"
+                    : "none",
+                  color: "oklch(0.97 0.02 280)",
+                }}
+              >
+                <Gamepad2 size={16} />
+              </button>
+
+              {/* Games popup */}
+              <AnimatePresence>
+                {showGamesMenu && (
+                  <motion.div
+                    data-ocid="chat.games.popover"
+                    initial={{ opacity: 0, scale: 0.85, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.85, y: 10 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 28 }}
+                    className="absolute bottom-12 left-0 rounded-2xl p-2 flex flex-col gap-1 min-w-[260px] z-50"
+                    style={{
+                      background: "oklch(0.13 0.05 280)",
+                      border: "1px solid oklch(0.28 0.08 280 / 0.7)",
+                      boxShadow:
+                        "0 8px 32px oklch(0 0 0 / 0.5), 0 0 40px oklch(0.65 0.28 305 / 0.1)",
+                    }}
+                  >
+                    <p
+                      className="text-xs font-bold px-2 py-1 tracking-widest"
+                      style={{ color: "oklch(0.5 0.08 280)" }}
+                    >
+                      GAMES
+                    </p>
+                    {[
+                      {
+                        id: "rps" as const,
+                        label: "Rock Paper Scissors",
+                        emoji: "✊",
+                      },
+                      { id: "ttt" as const, label: "Tic Tac Toe", emoji: "⬜" },
+                      { id: "ng" as const, label: "Number Guess", emoji: "🔢" },
+                    ].map((g) => (
+                      <div key={g.id} className="flex gap-1">
+                        <button
+                          type="button"
+                          data-ocid={`chat.games.${g.id}.button`}
+                          onClick={() => {
+                            setActiveGame(g.id);
+                            setShowGamesMenu(false);
+                          }}
+                          className="flex-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
+                          style={{
+                            background: "oklch(0.17 0.06 280)",
+                            border: "1px solid oklch(0.25 0.07 280 / 0.5)",
+                            color: "oklch(0.85 0.06 280)",
+                          }}
+                        >
+                          <span className="text-lg">{g.emoji}</span>
+                          {g.label}
+                        </button>
+                        <button
+                          type="button"
+                          data-ocid={`chat.games.${g.id}.secondary_button`}
+                          onClick={() => handleChallenge(g.id)}
+                          className="px-2 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
+                          style={{
+                            background: "oklch(0.55 0.22 50 / 0.2)",
+                            border: "1px solid oklch(0.65 0.22 50 / 0.4)",
+                            color: "oklch(0.78 0.2 55)",
+                          }}
+                          title="Send challenge"
+                        >
+                          🎯
+                        </button>
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Emoji picker button */}
+            <div className="relative flex-shrink-0">
+              <button
+                type="button"
+                data-ocid="emoji.toggle"
+                onClick={() => {
+                  setShowEmojiPicker((v) => !v);
+                  setShowGamesMenu(false);
+                }}
+                className="flex-shrink-0 p-1.5 rounded-full transition-all hover:scale-110"
+                style={{
+                  color: showEmojiPicker
+                    ? "oklch(0.78 0.15 85)"
+                    : "oklch(0.5 0.06 280)",
+                }}
+                title="Emoji"
+              >
+                <Smile size={20} strokeWidth={1.5} />
+              </button>
+
+              {/* Emoji picker panel */}
+              <AnimatePresence>
+                {showEmojiPicker && (
+                  <motion.div
+                    data-ocid="emoji.panel"
+                    initial={{ opacity: 0, scale: 0.85, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.85, y: 10 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 28 }}
+                    className="absolute bottom-12 left-0 rounded-2xl p-3 z-50"
+                    style={{
+                      background: "oklch(0.13 0.05 280)",
+                      border: "1px solid oklch(0.28 0.08 280 / 0.7)",
+                      boxShadow: "0 8px 32px oklch(0 0 0 / 0.5)",
+                      width: "220px",
+                    }}
+                  >
+                    <div className="grid grid-cols-8 gap-1">
+                      {EMOJIS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => {
+                            setText((prev) => prev + emoji);
+                            setShowEmojiPicker(false);
+                          }}
+                          className="w-7 h-7 flex items-center justify-center text-lg rounded-lg transition-all hover:scale-125 hover:bg-white/10"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Text input */}
+            <input
+              data-ocid="chat.input"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Message"
+              disabled={isSending}
+              className="flex-1 bg-transparent border-none outline-none text-sm min-w-0"
+              style={{ color: "oklch(0.88 0.03 280)" }}
+            />
+
+            {/* Paperclip attachment */}
+            <button
+              type="button"
+              data-ocid="chat.upload_button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-shrink-0 p-1.5 rounded-full transition-all hover:scale-110"
+              style={{
+                color: mediaPreview
+                  ? "oklch(0.85 0.15 305)"
+                  : "oklch(0.5 0.06 280)",
+              }}
+              title="Attach photo or video"
+            >
+              <Paperclip size={20} strokeWidth={1.5} />
+            </button>
+
+            {/* Camera button */}
+            <button
+              type="button"
+              data-ocid="camera.open_modal_button"
+              onClick={() => setShowCameraModal(true)}
+              className="flex-shrink-0 p-1.5 rounded-full transition-all hover:scale-110"
+              style={{ color: "oklch(0.72 0.18 220)" }}
+              title="Camera"
+            >
+              <Camera size={18} strokeWidth={1.5} />
+            </button>
+
+            {/* Send button */}
+            <button
+              type="button"
+              data-ocid="chat.submit_button"
+              onClick={handleSend}
+              disabled={(!text.trim() && !mediaPreview) || isSending}
+              className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-40"
+              style={{
+                background:
+                  text.trim() || mediaPreview
+                    ? "linear-gradient(135deg, oklch(0.55 0.28 305), oklch(0.5 0.25 270))"
+                    : "linear-gradient(135deg, oklch(0.45 0.22 305), oklch(0.4 0.2 270))",
+                boxShadow:
+                  text.trim() || mediaPreview
+                    ? "0 0 18px oklch(0.65 0.28 305 / 0.55)"
+                    : "none",
+                color: "oklch(0.97 0.02 280)",
+              }}
+            >
+              ➤
+            </button>
+
             <input
               ref={fileInputRef}
               type="file"
@@ -656,67 +1130,179 @@ export default function ChatRoom({
               className="hidden"
               onChange={handleFileSelect}
             />
-            {/* Paperclip / media upload button */}
-            <button
-              type="button"
-              data-ocid="chat.upload_button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2 rounded-xl transition-all duration-200 hover:scale-105 flex-shrink-0"
-              style={{
-                background: mediaPreview
-                  ? "oklch(0.65 0.28 305 / 0.2)"
-                  : "oklch(0.15 0.04 275)",
-                border: mediaPreview
-                  ? "1px solid oklch(0.65 0.28 305 / 0.5)"
-                  : "1px solid oklch(0.28 0.08 280 / 0.6)",
-                color: mediaPreview
-                  ? "oklch(0.85 0.15 305)"
-                  : "oklch(0.55 0.06 280)",
-              }}
-              title="Attach photo or video"
-            >
-              <Paperclip size={16} />
-            </button>
-
-            <Input
-              data-ocid="chat.input"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Cast your message..."
-              className="flex-1 rounded-xl border-0 focus-visible:ring-1"
-              style={{
-                background: "oklch(0.14 0.04 275)",
-                border: "1px solid oklch(0.28 0.08 280 / 0.6)",
-                color: "oklch(0.9 0.03 280)",
-                outline: "none",
-              }}
-              disabled={isSending}
-            />
-            <Button
-              type="button"
-              data-ocid="chat.submit_button"
-              onClick={handleSend}
-              disabled={(!text.trim() && !mediaPreview) || isSending}
-              className="rounded-xl px-4 py-2 font-medium transition-all duration-200"
-              style={{
-                background:
-                  text.trim() || mediaPreview
-                    ? "linear-gradient(135deg, oklch(0.65 0.28 305), oklch(0.6 0.25 250))"
-                    : "oklch(0.18 0.04 275)",
-                color: "oklch(0.95 0.02 280)",
-                border: "none",
-                boxShadow:
-                  text.trim() || mediaPreview
-                    ? "0 0 16px oklch(0.65 0.28 305 / 0.4)"
-                    : "none",
-              }}
-            >
-              <ChevronRight size={18} />
-            </Button>
           </div>
         </div>
       </div>
+
+      {/* Game overlays */}
+      <AnimatePresence>
+        {activeGame === "ttt" && (
+          <TicTacToe onClose={() => setActiveGame(null)} />
+        )}
+        {activeGame === "ng" && (
+          <NumberGuess onClose={() => setActiveGame(null)} />
+        )}
+      </AnimatePresence>
+
+      {/* Camera Modal */}
+      <AnimatePresence>
+        {showCameraModal && (
+          <motion.div
+            data-ocid="camera.modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{
+              background: "oklch(0 0 0 / 0.8)",
+              backdropFilter: "blur(8px)",
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-sm rounded-3xl p-5 flex flex-col gap-4"
+              style={{
+                background:
+                  "linear-gradient(145deg, oklch(0.13 0.06 285), oklch(0.09 0.04 270))",
+                border: "1px solid oklch(0.72 0.18 220 / 0.4)",
+                boxShadow: "0 0 60px oklch(0.72 0.18 220 / 0.2)",
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <h3
+                  className="font-display text-xl font-black"
+                  style={{ color: "oklch(0.92 0.04 280)" }}
+                >
+                  📸 Camera
+                </h3>
+                <button
+                  type="button"
+                  data-ocid="camera.close_button"
+                  onClick={() => {
+                    setShowCameraModal(false);
+                    camera.stopCamera();
+                  }}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all hover:scale-110"
+                  style={{
+                    background: "oklch(0.16 0.05 280)",
+                    border: "1px solid oklch(0.28 0.08 280 / 0.6)",
+                    color: "oklch(0.7 0.06 280)",
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Video preview */}
+              <div
+                className="relative rounded-2xl overflow-hidden"
+                style={{
+                  background: "oklch(0.1 0.03 280)",
+                  border: "1px solid oklch(0.22 0.06 280 / 0.4)",
+                  height: "200px",
+                }}
+              >
+                <video
+                  ref={camera.videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                  style={{ display: camera.isActive ? "block" : "none" }}
+                />
+                {!camera.isActive && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-4xl mb-2">📷</div>
+                      <p
+                        className="text-sm"
+                        style={{ color: "oklch(0.55 0.06 280)" }}
+                      >
+                        {camera.isLoading ? "Starting camera..." : "Camera off"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {camera.isLoading && (
+                  <div
+                    className="absolute inset-0 flex items-center justify-center"
+                    data-ocid="camera.loading_state"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+                      style={{ borderColor: "oklch(0.72 0.18 220)" }}
+                    />
+                  </div>
+                )}
+              </div>
+              <canvas ref={camera.canvasRef} className="hidden" />
+
+              {/* Error */}
+              {camera.error && (
+                <p
+                  className="text-sm text-center"
+                  data-ocid="camera.error_state"
+                  style={{ color: "oklch(0.65 0.22 25)" }}
+                >
+                  ⚠️ {camera.error.message}
+                </p>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2">
+                {!camera.isActive && !camera.isLoading && (
+                  <button
+                    type="button"
+                    data-ocid="camera.button"
+                    onClick={() => camera.startCamera()}
+                    className="flex-1 py-2.5 rounded-2xl font-bold text-sm transition-all hover:scale-105"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, oklch(0.55 0.22 220), oklch(0.5 0.2 200))",
+                      color: "oklch(0.97 0.02 280)",
+                    }}
+                  >
+                    Start Camera
+                  </button>
+                )}
+                {camera.isActive && (
+                  <>
+                    <button
+                      type="button"
+                      data-ocid="camera.primary_button"
+                      onClick={handleCapturePhoto}
+                      className="flex-1 py-2.5 rounded-2xl font-bold text-sm transition-all hover:scale-105"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, oklch(0.65 0.28 305), oklch(0.6 0.25 250))",
+                        color: "oklch(0.97 0.02 280)",
+                        boxShadow: "0 0 20px oklch(0.65 0.28 305 / 0.4)",
+                      }}
+                    >
+                      📸 Capture
+                    </button>
+                    <button
+                      type="button"
+                      data-ocid="camera.toggle"
+                      onClick={() => camera.switchCamera()}
+                      className="px-4 py-2.5 rounded-2xl font-bold text-sm transition-all hover:scale-105 sm:hidden"
+                      style={{
+                        background: "oklch(0.17 0.06 280)",
+                        border: "1px solid oklch(0.28 0.08 280 / 0.6)",
+                        color: "oklch(0.75 0.06 280)",
+                      }}
+                    >
+                      🔄
+                    </button>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Online Members Panel */}
       <AnimatePresence>
@@ -742,53 +1328,36 @@ export default function ChatRoom({
               <div className="flex items-center gap-2">
                 <Users size={14} style={{ color: "oklch(0.65 0.28 305)" }} />
                 <span
-                  className="text-sm font-semibold"
+                  className="text-sm font-bold"
                   style={{ color: "oklch(0.85 0.06 280)" }}
                 >
-                  Online Members
+                  Online ({onlineUsers.length})
                 </span>
               </div>
               <button
                 type="button"
+                data-ocid="chat.members.close_button"
                 onClick={() => setShowMembers(false)}
-                className="p-1 rounded-lg transition-colors hover:opacity-70"
-                style={{ color: "oklch(0.55 0.06 280)" }}
+                className="w-6 h-6 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                style={{
+                  background: "oklch(0.16 0.05 280)",
+                  color: "oklch(0.55 0.06 280)",
+                }}
               >
-                <X size={14} />
+                <X size={12} />
               </button>
             </div>
-
-            <div
-              className="flex items-center gap-2 px-4 py-2 border-b"
-              style={{ borderColor: "oklch(0.18 0.05 280 / 0.4)" }}
-            >
-              <span
-                className="w-2 h-2 rounded-full animate-pulse"
-                style={{ background: "oklch(0.7 0.25 140)" }}
-              />
-              <span className="text-xs" style={{ color: "oklch(0.6 0.1 140)" }}>
-                {onlineUsers.length} online now
-              </span>
-            </div>
-
             <ScrollArea className="flex-1">
-              <div className="px-3 py-3 space-y-1">
-                {onlineUsers.length === 0 && (
-                  <p
-                    className="text-xs text-center py-6"
-                    style={{ color: "oklch(0.45 0.04 280)" }}
-                  >
-                    No one online yet
-                  </p>
-                )}
+              <div className="p-3 space-y-1">
                 {onlineUsers.map((user, i) => {
                   const color = getUserColor(user);
                   const isMe = user === username;
                   return (
                     <motion.div
                       key={user}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
+                      data-ocid={`chat.members.item.${i + 1}`}
+                      initial={{ x: 20, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
                       transition={{ delay: i * 0.05 }}
                       className="flex items-center gap-3 px-3 py-2 rounded-lg"
                       style={{

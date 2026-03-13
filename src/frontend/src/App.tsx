@@ -2,9 +2,11 @@ import { Toaster } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import ChatRoom from "./components/ChatRoom";
+import GameRoom from "./components/GameRoom";
 import Lobby from "./components/Lobby";
 import MatchmakingScreen from "./components/MatchmakingScreen";
 import RoleplayRoom from "./components/RoleplayRoom";
+import SocialMediaRoom from "./components/SocialMediaRoom";
 import SplashScreen from "./components/SplashScreen";
 import TruthOrDareRoom from "./components/TruthOrDareRoom";
 import UsernamePicker from "./components/UsernamePicker";
@@ -18,7 +20,10 @@ export type Room =
   | { type: "truth-dare" }
   | { type: "roleplay"; persona: string }
   | { type: "stranger"; roomId: string }
-  | { type: "chill" };
+  | { type: "chill" }
+  | { type: "game" }
+  | { type: "ai-bot" }
+  | { type: "social-media" };
 
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
@@ -75,6 +80,10 @@ export default function App() {
                   setMatchmaking(false);
                   setRoom({ type: "lobby" });
                 }}
+                onBotChat={() => {
+                  setMatchmaking(false);
+                  setRoom({ type: "ai-bot" });
+                }}
               />
             )}
             {room.type === "world" && (
@@ -126,6 +135,29 @@ export default function App() {
                 roomEmoji="☕"
                 username={username}
                 onRename={handleRename}
+                onBack={() => setRoom({ type: "lobby" })}
+              />
+            )}
+            {room.type === "ai-bot" && (
+              <ChatRoom
+                roomId={`ai-bot-${username}`}
+                roomName="AI Bot"
+                roomEmoji="🤖"
+                username={username}
+                onRename={handleRename}
+                onBack={() => setRoom({ type: "lobby" })}
+              />
+            )}
+            {room.type === "game" && (
+              <GameRoom
+                username={username}
+                onRename={handleRename}
+                onBack={() => setRoom({ type: "lobby" })}
+              />
+            )}
+            {room.type === "social-media" && (
+              <SocialMediaRoom
+                username={username}
                 onBack={() => setRoom({ type: "lobby" })}
               />
             )}

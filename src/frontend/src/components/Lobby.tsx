@@ -2,7 +2,6 @@ import { Sparkles } from "lucide-react";
 import { useState } from "react";
 import type { Room } from "../App";
 import { useOnlineCount } from "../hooks/useQueries";
-import Logo3D from "./Logo3D";
 import PrivateRoomModal from "./PrivateRoomModal";
 import RoleplayEntryModal from "./RoleplayEntryModal";
 import UsernameTopBar from "./UsernameTopBar";
@@ -37,6 +36,17 @@ function OnlineBadge({ roomId }: { roomId: string }) {
 
 const rooms = [
   {
+    id: "stranger" as const,
+    countId: "matchmaking",
+    title: "1v1 Stranger Chat",
+    desc: "Get matched with a random wanderer",
+    emoji: "👥",
+    glow: "oklch(0.7 0.28 330)",
+    border: "oklch(0.7 0.28 330 / 0.4)",
+    iconColor: "oklch(0.78 0.22 340)",
+    tag: "#1 LIVE MATCH",
+  },
+  {
     id: "world" as const,
     countId: "world",
     title: "World Chat",
@@ -45,7 +55,18 @@ const rooms = [
     glow: "oklch(0.6 0.25 250)",
     border: "oklch(0.6 0.25 250 / 0.4)",
     iconColor: "oklch(0.72 0.2 200)",
-    tag: "PUBLIC",
+    tag: "#2 PUBLIC",
+  },
+  {
+    id: "social-media" as const,
+    countId: "social-media",
+    title: "Social Media",
+    desc: "Post photos, videos, blogs and connect",
+    emoji: "📱",
+    glow: "oklch(0.7 0.28 330)",
+    border: "oklch(0.7 0.28 330 / 0.4)",
+    iconColor: "oklch(0.78 0.22 340)",
+    tag: "#3 SOCIAL",
   },
   {
     id: "private" as const,
@@ -81,17 +102,6 @@ const rooms = [
     tag: "PERSONA",
   },
   {
-    id: "stranger" as const,
-    countId: "matchmaking",
-    title: "1v1 Stranger Chat",
-    desc: "Get matched with a random wanderer",
-    emoji: "👥",
-    glow: "oklch(0.7 0.28 330)",
-    border: "oklch(0.7 0.28 330 / 0.4)",
-    iconColor: "oklch(0.78 0.22 340)",
-    tag: "LIVE MATCH",
-  },
-  {
     id: "chill" as const,
     countId: "chill",
     title: "Chill Lounge",
@@ -102,7 +112,20 @@ const rooms = [
     iconColor: "oklch(0.72 0.18 185)",
     tag: "RELAXED",
   },
+  {
+    id: "game" as const,
+    countId: "gamezone",
+    title: "Game Zone",
+    desc: "Play games solo or challenge others",
+    emoji: "🎮",
+    glow: "oklch(0.65 0.22 50)",
+    border: "oklch(0.65 0.22 50 / 0.4)",
+    iconColor: "oklch(0.78 0.2 55)",
+    tag: "PLAY",
+  },
 ];
+
+const FANTASY_LETTERS = "FantasyLand".split("").map((char, i) => ({ char, i }));
 
 export default function Lobby({ username, onEnterRoom, onRename }: Props) {
   const [showPrivate, setShowPrivate] = useState(false);
@@ -116,11 +139,13 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
     else if (id === "truth-dare") onEnterRoom({ type: "truth-dare" });
     else if (id === "stranger") onEnterRoom({ type: "stranger", roomId: "" });
     else if (id === "chill") onEnterRoom({ type: "chill" });
+    else if (id === "game") onEnterRoom({ type: "game" });
+    else if (id === "social-media") onEnterRoom({ type: "social-media" });
   };
 
   return (
     <div
-      className="min-h-screen stars-bg relative overflow-hidden pt-10"
+      className="min-h-screen stars-bg relative overflow-hidden pb-20"
       style={{
         background:
           "radial-gradient(ellipse at 30% 20%, oklch(0.14 0.06 280) 0%, oklch(0.09 0.03 260) 40%, oklch(0.07 0.02 280) 100%)",
@@ -170,20 +195,23 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
         className="relative z-10 flex items-center justify-between px-6 py-4 border-b"
         style={{ borderColor: "oklch(0.22 0.06 280 / 0.5)" }}
       >
-        <div className="flex items-center gap-3">
-          <Logo3D size={40} />
-          <span
-            className="font-display text-2xl font-black"
-            style={{
-              background:
-                "linear-gradient(135deg, oklch(0.92 0.04 280) 0%, oklch(0.78 0.15 85) 40%, oklch(0.85 0.28 305) 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
-            FantasyLand
-          </span>
+        <div className="flex items-center gap-0">
+          {FANTASY_LETTERS.map(({ char, i }) => (
+            <span
+              key={`header-${i}`}
+              className="font-display text-sm font-black"
+              style={{
+                background:
+                  "linear-gradient(135deg, oklch(0.92 0.04 280) 0%, oklch(0.78 0.15 85) 40%, oklch(0.85 0.28 305) 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                display: "inline-block",
+              }}
+            >
+              {char}
+            </span>
+          ))}
         </div>
         <div
           className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium"
@@ -202,32 +230,17 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
       {/* Main content */}
       <main className="relative z-10 px-6 py-12">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h1
-              className="font-display text-4xl sm:text-5xl font-black mb-3"
-              style={{
-                background:
-                  "linear-gradient(135deg, oklch(0.92 0.04 280), oklch(0.78 0.15 85) 50%, oklch(0.85 0.28 305))",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              Welcome the world of fantasy
-            </h1>
-            <p className="text-muted-foreground text-lg">
-              Step through the portal and begin your adventure
-            </p>
-          </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {rooms.map((room, idx) => {
               const isHovered = hoveredRoom === room.id;
+              const isGameZone = room.id === "game";
               return (
                 <button
                   type="button"
                   key={room.id}
-                  data-ocid={`lobby.room.${idx + 1}`}
+                  data-ocid={
+                    isGameZone ? "gamezone.card" : `lobby.room.${idx + 1}`
+                  }
                   className="group relative rounded-xl p-6 text-left cursor-pointer transition-all duration-300 overflow-hidden"
                   style={{
                     background: isHovered
@@ -295,6 +308,28 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
                 </button>
               );
             })}
+          </div>
+
+          {/* Tagline at bottom */}
+          <div className="text-center mt-16 mb-4">
+            <p
+              className="text-lg font-medium mb-1"
+              style={{ color: "oklch(0.78 0.15 85)" }}
+            >
+              Welcome the new world of
+            </p>
+            <h1
+              className="font-display text-4xl sm:text-5xl font-black tracking-widest uppercase"
+              style={{
+                background:
+                  "linear-gradient(135deg, oklch(0.92 0.04 280) 0%, oklch(0.78 0.15 85) 40%, oklch(0.85 0.28 305) 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              FANTASY
+            </h1>
           </div>
         </div>
       </main>
