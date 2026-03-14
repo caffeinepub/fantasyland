@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { useCamera } from "../camera/useCamera";
 import { usePresence } from "../hooks/usePresence";
 import {
   useJoinRPSGame,
@@ -263,7 +262,6 @@ export default function ChatRoom({
 
   // Camera modal
   const [showCameraModal, setShowCameraModal] = useState(false);
-  const camera = useCamera({ facingMode: "user", format: "image/jpeg" });
 
   // AI Bot mode
   const isAiBot = roomId.startsWith("ai-bot-");
@@ -310,13 +308,6 @@ export default function ChatRoom({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, optimisticMessages]);
-
-  // Stop camera when modal closes
-  useEffect(() => {
-    if (!showCameraModal && camera.isActive) {
-      camera.stopCamera();
-    }
-  }, [showCameraModal, camera.isActive, camera.stopCamera]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1137,21 +1128,10 @@ export default function ChatRoom({
         onSendPhoto={(dataUrl) => {
           setMediaPreview({ url: dataUrl, type: "image/jpeg" });
         }}
-        onGalleryPick={(dataUrl) => {
-          setMediaPreview({ url: dataUrl, type: "image/jpeg" });
-        }}
         onSendReel={(videoBlob) => {
           const url = URL.createObjectURL(videoBlob);
           setMediaPreview({ url, type: "video/webm" });
         }}
-        videoRef={camera.videoRef}
-        canvasRef={camera.canvasRef}
-        isActive={camera.isActive}
-        isLoading={camera.isLoading}
-        error={camera.error}
-        onStartCamera={camera.startCamera}
-        onStopCamera={camera.stopCamera}
-        onSwitchCamera={camera.switchCamera}
       />
 
       {/* Online Members Panel */}

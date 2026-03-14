@@ -14,9 +14,7 @@ import {
   ZapOff,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import type { RefObject } from "react";
-import { useEffect, useRef, useState } from "react";
-import type { CameraError } from "../camera/useCamera";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const FILTERS: { name: string; css: string }[] = [
   { name: "Normal", css: "none" },
@@ -50,15 +48,20 @@ interface CameraModalProps {
   onSendPhoto: (dataUrl: string, caption?: string) => void;
   onAddStory?: (dataUrl: string, caption?: string) => void;
   onSendReel?: (videoBlob: Blob) => void;
-  videoRef: RefObject<HTMLVideoElement | null>;
-  canvasRef: RefObject<HTMLCanvasElement | null>;
-  isActive: boolean;
-  isLoading: boolean;
-  error: CameraError | null;
-  onStartCamera: () => void;
-  onStopCamera: () => void;
-  onSwitchCamera: () => void;
-  onGalleryPick?: (dataUrl: string) => void;
+}
+
+function getSupportedMimeType(): string | null {
+  const types = [
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+    "video/mp4",
+  ];
+  if (typeof MediaRecorder === "undefined") return null;
+  for (const t of types) {
+    if (MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return null;
 }
 
 export default function CameraModal({
@@ -67,21 +70,23 @@ export default function CameraModal({
   onSendPhoto,
   onAddStory,
   onSendReel,
-  videoRef,
-  canvasRef,
-  isActive,
-  isLoading,
-  error,
-  onStartCamera,
-  onStopCamera,
-  onSwitchCamera,
-  onGalleryPick: _onGalleryPick,
 }: CameraModalProps) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const facingModeRef = useRef<"user" | "environment">("user");
+
+  const [isActive, setIsActive] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
   const [mode, setMode] = useState<Mode>("POST");
   const [activeFilter, setActiveFilter] = useState(0);
   const [flashOn, setFlashOn] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordProgress, setRecordProgress] = useState(0);
+  const [reelSupported, setReelSupported] = useState(true);
+
   // Preview state
   const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<Mode | null>(null);
@@ -93,22 +98,97 @@ export default function CameraModal({
   const recordStartRef = useRef<number>(0);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  // Start camera when modal opens
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      for (const track of streamRef.current.getTracks()) {
+        track.stop();
+      }
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsActive(false);
+    setIsLoading(false);
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    setIsLoading(true);
+    setCameraError(null);
+    // Stop any existing stream first
+    if (streamRef.current) {
+      for (const track of streamRef.current.getTracks()) track.stop();
+      streamRef.current = null;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facingModeRef.current },
+        audio: true,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+      setIsActive(true);
+      setIsLoading(false);
+    } catch {
+      // Try fallback facing mode
+      const fallback =
+        facingModeRef.current === "user" ? "environment" : "user";
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: fallback },
+          audio: true,
+        });
+        facingModeRef.current = fallback;
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => {});
+        }
+        setIsActive(true);
+        setIsLoading(false);
+      } catch (err2) {
+        const msg = err2 instanceof Error ? err2.message : "Camera unavailable";
+        setCameraError(msg);
+        setIsLoading(false);
+      }
+    }
+  }, []);
+
+  const switchCamera = useCallback(async () => {
+    facingModeRef.current =
+      facingModeRef.current === "user" ? "environment" : "user";
+    await startCamera();
+  }, [startCamera]);
+
+  // Start/stop camera when modal opens/closes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: startCamera and stopCamera are stable useCallback refs; including them would cause infinite loops
   useEffect(() => {
-    if (isOpen && !isActive && !isLoading && !previewDataUrl) {
+    if (isOpen) {
+      // Check reel support
+      setReelSupported(getSupportedMimeType() !== null);
       const timer = setTimeout(() => {
-        onStartCamera();
+        startCamera();
       }, 150);
       return () => clearTimeout(timer);
     }
-    if (!isOpen) {
-      stopRecordingClean();
-      setPreviewDataUrl(null);
-      setPreviewMode(null);
-      setCaption("");
-    }
+    // Cleanup on close
+    stopRecordingClean();
+    stopCamera();
+    setPreviewDataUrl(null);
+    setPreviewMode(null);
+    setCaption("");
+    setCameraError(null);
   }, [isOpen]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   const stopRecordingClean = () => {
     if (recordTimerRef.current) {
@@ -119,7 +199,9 @@ export default function CameraModal({
       mediaRecorderRef.current &&
       mediaRecorderRef.current.state !== "inactive"
     ) {
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {}
     }
     setIsRecording(false);
     setRecordProgress(0);
@@ -135,8 +217,10 @@ export default function CameraModal({
     canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
+    // Apply CSS filter to canvas capture
     ctx.filter = currentFilter === "none" ? "" : currentFilter;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.filter = "";
     return canvas.toDataURL("image/jpeg", 0.9);
   };
 
@@ -144,10 +228,9 @@ export default function CameraModal({
     if (mode === "POST" || mode === "STORY") {
       const dataUrl = capturePhoto();
       if (dataUrl) {
-        // Show preview instead of immediately sending
         setPreviewDataUrl(dataUrl);
         setPreviewMode(mode);
-        onStopCamera();
+        stopCamera();
       }
     } else if (mode === "REEL") {
       startReel();
@@ -179,23 +262,32 @@ export default function CameraModal({
     setPreviewDataUrl(null);
     setPreviewMode(null);
     setCaption("");
-    // Restart camera
-    setTimeout(() => onStartCamera(), 150);
+    setTimeout(() => startCamera(), 150);
   };
 
   const startReel = () => {
-    const video = videoRef.current;
-    if (!video || !video.srcObject) return;
-    const stream = video.srcObject as MediaStream;
+    const stream = streamRef.current;
+    if (!stream) return;
+    const mimeType = getSupportedMimeType();
+    if (!mimeType) return;
     recordedChunksRef.current = [];
-    const mr = new MediaRecorder(stream, { mimeType: "video/webm" });
+    let mr: MediaRecorder;
+    try {
+      mr = new MediaRecorder(stream, { mimeType });
+    } catch {
+      try {
+        mr = new MediaRecorder(stream);
+      } catch {
+        return;
+      }
+    }
     mr.ondataavailable = (e) => {
       if (e.data.size > 0) recordedChunksRef.current.push(e.data);
     };
     mr.onstop = () => {
-      const blob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+      const blob = new Blob(recordedChunksRef.current, { type: mimeType });
       if (onSendReel) onSendReel(blob);
-      onStopCamera();
+      stopCamera();
       onClose();
     };
     mr.start(100);
@@ -220,7 +312,9 @@ export default function CameraModal({
       mediaRecorderRef.current &&
       mediaRecorderRef.current.state !== "inactive"
     ) {
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {}
     }
     setIsRecording(false);
     setRecordProgress(0);
@@ -228,7 +322,7 @@ export default function CameraModal({
 
   const handleClose = () => {
     stopRecordingClean();
-    onStopCamera();
+    stopCamera();
     setPreviewDataUrl(null);
     setPreviewMode(null);
     setCaption("");
@@ -239,6 +333,10 @@ export default function CameraModal({
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   const strokeDashoffset =
     CIRCUMFERENCE - (recordProgress / 100) * CIRCUMFERENCE;
+
+  const availableModes: Mode[] = reelSupported
+    ? ["POST", "STORY", "REEL"]
+    : ["POST", "STORY"];
 
   return (
     <AnimatePresence>
@@ -286,7 +384,7 @@ export default function CameraModal({
                   <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
                     <input
                       type="text"
-                      data-ocid="camera.preview.caption_input"
+                      data-ocid="camera.preview.input"
                       value={caption}
                       onChange={(e) => setCaption(e.target.value)}
                       placeholder="Add a caption..."
@@ -337,7 +435,7 @@ export default function CameraModal({
                   {/* Use photo */}
                   <button
                     type="button"
-                    data-ocid="camera.preview.use_button"
+                    data-ocid="camera.preview.save_button"
                     onClick={handleUsePhoto}
                     className="flex flex-col items-center gap-2 transition-all active:scale-90"
                   >
@@ -359,7 +457,7 @@ export default function CameraModal({
                   {/* Discard / close */}
                   <button
                     type="button"
-                    data-ocid="camera.preview.discard_button"
+                    data-ocid="camera.preview.close_button"
                     onClick={handleClose}
                     className="flex flex-col items-center gap-2 transition-all active:scale-90"
                   >
@@ -440,12 +538,12 @@ export default function CameraModal({
                       className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
                       style={{ borderColor: "rgba(255,255,255,0.4)" }}
                     />
-                  ) : error ? (
+                  ) : cameraError ? (
                     <div className="text-center px-8">
-                      <p className="text-white/60 text-sm">{error.message}</p>
+                      <p className="text-white/60 text-sm">{cameraError}</p>
                       <button
                         type="button"
-                        onClick={onStartCamera}
+                        onClick={startCamera}
                         className="mt-3 px-5 py-2 rounded-full text-sm font-semibold"
                         style={{
                           background: "rgba(255,255,255,0.15)",
@@ -458,7 +556,7 @@ export default function CameraModal({
                   ) : (
                     <button
                       type="button"
-                      onClick={onStartCamera}
+                      onClick={startCamera}
                       className="flex flex-col items-center gap-3"
                     >
                       <Camera size={48} color="rgba(255,255,255,0.4)" />
@@ -561,11 +659,9 @@ export default function CameraModal({
                 reader.onload = (ev) => {
                   const dataUrl = ev.target?.result as string;
                   if (!dataUrl) return;
-                  // Show preview for gallery picks too
-                  const currentMode = mode;
                   setPreviewDataUrl(dataUrl);
-                  setPreviewMode(currentMode);
-                  onStopCamera();
+                  setPreviewMode(mode);
+                  stopCamera();
                 };
                 reader.readAsDataURL(file);
                 e.target.value = "";
@@ -624,7 +720,7 @@ export default function CameraModal({
             <button
               type="button"
               data-ocid="camera.flip_button"
-              onClick={onSwitchCamera}
+              onClick={switchCamera}
               className="w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-90"
               style={{
                 background: "rgba(255,255,255,0.15)",
@@ -637,7 +733,7 @@ export default function CameraModal({
 
           {/* Mode tabs */}
           <div className="flex items-center justify-center gap-8 pb-safe pb-6">
-            {(["POST", "STORY", "REEL"] as Mode[]).map((m) => (
+            {availableModes.map((m) => (
               <button
                 key={m}
                 type="button"

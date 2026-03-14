@@ -14,7 +14,6 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useCamera } from "../camera/useCamera";
 import CameraModal from "./CameraModal";
 import UsernameTopBar from "./UsernameTopBar";
 
@@ -178,16 +177,6 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
     "home" | "reels" | "direct" | "search" | "profile"
   >("home");
   const [showCameraModal, setShowCameraModal] = useState(false);
-
-  const camera = useCamera({ facingMode: "user", format: "image/jpeg" });
-
-  // Stop camera when modal closes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
-  useEffect(() => {
-    if (!showCameraModal && camera.isActive) {
-      camera.stopCamera();
-    }
-  }, [showCameraModal]);
 
   // Stories state
   const [stories, setStories] = useState<Story[]>(SAMPLE_STORIES);
@@ -1196,10 +1185,6 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
           setMediaPreview(dataUrl);
           setMediaType("image");
         }}
-        onGalleryPick={(dataUrl) => {
-          setMediaPreview(dataUrl);
-          setMediaType("image");
-        }}
         onAddStory={(dataUrl) => {
           const newStory: Story = {
             id: nextStoryId.current++,
@@ -1212,14 +1197,6 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
           };
           setStories((prev) => [newStory, ...prev]);
         }}
-        videoRef={camera.videoRef}
-        canvasRef={camera.canvasRef}
-        isActive={camera.isActive}
-        isLoading={camera.isLoading}
-        error={camera.error}
-        onStartCamera={camera.startCamera}
-        onStopCamera={camera.stopCamera}
-        onSwitchCamera={camera.switchCamera}
       />
     </div>
   );
