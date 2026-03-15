@@ -167,14 +167,12 @@ export default function CameraModal({
   // biome-ignore lint/correctness/useExhaustiveDependencies: startCamera and stopCamera are stable useCallback refs; including them would cause infinite loops
   useEffect(() => {
     if (isOpen) {
-      // Check reel support
       setReelSupported(getSupportedMimeType() !== null);
       const timer = setTimeout(() => {
         startCamera();
       }, 150);
       return () => clearTimeout(timer);
     }
-    // Cleanup on close
     stopRecordingClean();
     stopCamera();
     setPreviewDataUrl(null);
@@ -217,28 +215,31 @@ export default function CameraModal({
     canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    // Apply CSS filter to canvas capture
     ctx.filter = currentFilter === "none" ? "" : currentFilter;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     ctx.filter = "";
     return canvas.toDataURL("image/jpeg", 0.9);
   };
 
-  const handleShutterPress = () => {
-    if (mode === "POST" || mode === "STORY") {
-      const dataUrl = capturePhoto();
-      if (dataUrl) {
-        setPreviewDataUrl(dataUrl);
-        setPreviewMode(mode);
-        stopCamera();
-      }
-    } else if (mode === "REEL") {
-      startReel();
+  // For POST and STORY: onClick (reliable on mobile)
+  const handlePhotoClick = () => {
+    if (!isActive) return;
+    const dataUrl = capturePhoto();
+    if (dataUrl) {
+      setPreviewDataUrl(dataUrl);
+      setPreviewMode(mode);
+      stopCamera();
     }
   };
 
-  const handleShutterRelease = () => {
-    if (mode === "REEL" && isRecording) {
+  // For REEL: hold to record — onPointerDown starts, onPointerUp stops
+  const handleReelPointerDown = () => {
+    if (!isActive) return;
+    startReel();
+  };
+
+  const handleReelPointerUp = () => {
+    if (isRecording) {
       stopReel();
     }
   };
@@ -360,8 +361,8 @@ export default function CameraModal({
                 transition={{ duration: 0.18 }}
                 className="absolute inset-0 z-20 flex flex-col bg-black"
               >
-                {/* Preview image */}
-                <div className="flex-1 relative">
+                {/* Preview image — fixed height, no overlay on top of input */}
+                <div className="flex-1 relative overflow-hidden">
                   <img
                     src={previewDataUrl}
                     alt="Preview"
@@ -379,38 +380,45 @@ export default function CameraModal({
                   >
                     {previewMode === "STORY" ? "ADD TO STORY" : "POST PHOTO"}
                   </div>
+                </div>
 
-                  {/* Caption input overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
-                    <input
-                      type="text"
-                      data-ocid="camera.preview.input"
-                      value={caption}
-                      onChange={(e) => setCaption(e.target.value)}
-                      placeholder="Add a caption..."
-                      maxLength={200}
-                      className="w-full rounded-xl px-4 py-3 text-sm text-white text-center outline-none"
-                      style={{
-                        background: "rgba(0,0,0,0.45)",
-                        backdropFilter: "blur(10px)",
-                        WebkitBackdropFilter: "blur(10px)",
-                        border: "1px solid rgba(255,255,255,0.2)",
-                        color: "white",
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.border =
-                          "1px solid rgba(255,255,255,0.5)";
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.border =
-                          "1px solid rgba(255,255,255,0.2)";
-                      }}
-                    />
-                  </div>
+                {/* Caption input — OUTSIDE image container so mobile keyboard doesn't overlap */}
+                <div
+                  className="px-4 pt-3 pb-2"
+                  style={{ background: "rgba(0,0,0,0.9)" }}
+                >
+                  <input
+                    type="text"
+                    data-ocid="camera.preview.input"
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    placeholder="Add a caption..."
+                    maxLength={200}
+                    className="w-full rounded-xl px-4 py-3 text-sm text-white outline-none"
+                    style={{
+                      background: "rgba(255,255,255,0.08)",
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      color: "white",
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.border =
+                        "1px solid rgba(168,85,247,0.7)";
+                      e.currentTarget.style.boxShadow =
+                        "0 0 10px rgba(168,85,247,0.3)";
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.border =
+                        "1px solid rgba(255,255,255,0.2)";
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  />
                 </div>
 
                 {/* Action row */}
-                <div className="flex items-center justify-between px-10 py-8">
+                <div
+                  className="flex items-center justify-between px-10 py-5"
+                  style={{ background: "rgba(0,0,0,0.9)" }}
+                >
                   {/* Retake */}
                   <button
                     type="button"
@@ -454,7 +462,7 @@ export default function CameraModal({
                     </span>
                   </button>
 
-                  {/* Discard / close */}
+                  {/* Discard */}
                   <button
                     type="button"
                     data-ocid="camera.preview.close_button"
@@ -603,7 +611,7 @@ export default function CameraModal({
 
           <canvas ref={canvasRef} className="hidden" />
 
-          {/* Filter strip */}
+          {/* Filter strip — larger tap targets */}
           <div className="px-4 py-2">
             <div
               className="flex gap-2 overflow-x-auto pb-1"
@@ -615,8 +623,10 @@ export default function CameraModal({
                   type="button"
                   data-ocid={`camera.filter.item.${i + 1}`}
                   onClick={() => setActiveFilter(i)}
-                  className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all"
+                  className="flex-shrink-0 rounded-full text-xs font-semibold transition-all"
                   style={{
+                    padding: "8px 20px",
+                    minWidth: "64px",
                     background:
                       activeFilter === i ? "white" : "rgba(255,255,255,0.15)",
                     color: activeFilter === i ? "black" : "white",
@@ -693,27 +703,53 @@ export default function CameraModal({
                   />
                 </svg>
               )}
-              <button
-                type="button"
-                data-ocid="camera.shutter_button"
-                onPointerDown={handleShutterPress}
-                onPointerUp={handleShutterRelease}
-                className="w-[72px] h-[72px] rounded-full flex items-center justify-center transition-all active:scale-95"
-                style={{
-                  background: isRecording ? "red" : "white",
-                  border: "4px solid rgba(255,255,255,0.5)",
-                  boxShadow: isRecording
-                    ? "0 0 20px rgba(255,0,0,0.5)"
-                    : "0 0 20px rgba(255,255,255,0.3)",
-                }}
-              >
-                {mode === "REEL" && !isRecording && (
-                  <div
-                    className="w-7 h-7 rounded-full"
-                    style={{ background: "red" }}
-                  />
-                )}
-              </button>
+              {/* POST/STORY: onClick only (reliable on mobile) */}
+              {(mode === "POST" || mode === "STORY") && (
+                <button
+                  type="button"
+                  data-ocid="camera.shutter_button"
+                  onClick={handlePhotoClick}
+                  disabled={!isActive}
+                  className="w-[72px] h-[72px] rounded-full flex items-center justify-center transition-all active:scale-95"
+                  style={{
+                    background: isActive ? "white" : "rgba(255,255,255,0.3)",
+                    border: "4px solid rgba(255,255,255,0.5)",
+                    boxShadow: "0 0 20px rgba(255,255,255,0.3)",
+                    cursor: isActive ? "pointer" : "not-allowed",
+                  }}
+                />
+              )}
+              {/* REEL: hold-to-record — onPointerDown / onPointerUp */}
+              {mode === "REEL" && (
+                <button
+                  type="button"
+                  data-ocid="camera.shutter_button"
+                  onPointerDown={handleReelPointerDown}
+                  onPointerUp={handleReelPointerUp}
+                  onPointerLeave={handleReelPointerUp}
+                  disabled={!isActive}
+                  className="w-[72px] h-[72px] rounded-full flex items-center justify-center transition-all active:scale-95"
+                  style={{
+                    background: isRecording
+                      ? "red"
+                      : isActive
+                        ? "white"
+                        : "rgba(255,255,255,0.3)",
+                    border: "4px solid rgba(255,255,255,0.5)",
+                    boxShadow: isRecording
+                      ? "0 0 20px rgba(255,0,0,0.5)"
+                      : "0 0 20px rgba(255,255,255,0.3)",
+                    cursor: isActive ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {!isRecording && (
+                    <div
+                      className="w-7 h-7 rounded-full"
+                      style={{ background: "red" }}
+                    />
+                  )}
+                </button>
+              )}
             </div>
 
             {/* Flip camera */}
@@ -739,7 +775,7 @@ export default function CameraModal({
                 type="button"
                 data-ocid={`camera.mode.${m.toLowerCase()}_tab`}
                 onClick={() => setMode(m)}
-                className="text-sm font-bold tracking-widest transition-all"
+                className="text-sm font-bold tracking-widest transition-all py-2 px-4"
                 style={{
                   color: mode === m ? "white" : "rgba(255,255,255,0.45)",
                   textShadow:

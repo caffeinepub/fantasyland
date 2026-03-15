@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import AuthScreen from "./components/AuthScreen";
 import ChatRoom from "./components/ChatRoom";
 import GameRoom from "./components/GameRoom";
 import Lobby from "./components/Lobby";
@@ -27,8 +28,16 @@ export type Room =
   | { type: "social-media" }
   | { type: "profile" };
 
+function isAlreadyAuthed(): boolean {
+  return (
+    !!localStorage.getItem("fl_auth_user") ||
+    localStorage.getItem("fl_guest") === "1"
+  );
+}
+
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
+  const [isAuthed, setIsAuthed] = useState<boolean>(isAlreadyAuthed);
   const [room, setRoom] = useState<Room>({ type: "lobby" });
   const [username, setUsername] = useState<string>(() => {
     return localStorage.getItem("fl_username") || "";
@@ -48,14 +57,26 @@ export default function App() {
     setRoom({ type: "lobby" });
   };
 
+  const handleAuthed = (name: string) => {
+    setUsername(name);
+    setIsAuthed(true);
+  };
+
+  const handleGuest = () => {
+    setIsAuthed(true);
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-background font-body">
         {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
-        {splashDone && !hasUsername && (
+        {splashDone && !isAuthed && (
+          <AuthScreen onAuthed={handleAuthed} onGuest={handleGuest} />
+        )}
+        {splashDone && isAuthed && !hasUsername && (
           <UsernamePicker onConfirm={handlePickUsername} />
         )}
-        {splashDone && hasUsername && (
+        {splashDone && isAuthed && hasUsername && (
           <>
             {room.type === "lobby" && !matchmaking && (
               <Lobby
