@@ -1,6 +1,7 @@
 import { Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
+import { useBackendLogin, useBackendRegister } from "../hooks/useQueries";
 
 interface AuthScreenProps {
   onAuthed: (username: string) => void;
@@ -16,6 +17,10 @@ export default function AuthScreen({ onAuthed, onGuest }: AuthScreenProps) {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const loginMutation = useBackendLogin();
+  const registerMutation = useBackendRegister();
 
   const validate = () => {
     if (username.trim().length < 3) {
@@ -30,33 +35,74 @@ export default function AuthScreen({ onAuthed, onGuest }: AuthScreenProps) {
     return true;
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!validate()) return;
-    const storedUser = localStorage.getItem("fl_auth_user");
-    const storedPass = localStorage.getItem("fl_auth_pass");
-    if (storedUser === username.trim() && storedPass === password) {
-      setSuccess("Welcome back! Logging in...");
-      localStorage.setItem("fl_username", username.trim());
-      setTimeout(() => onAuthed(username.trim()), 600);
-    } else if (!storedUser) {
-      setError("No account found. Please sign up first.");
-    } else {
-      setError("Incorrect username or password.");
+    setLoading(true);
+    try {
+      const token = await loginMutation.mutateAsync({
+        username: username.trim(),
+        password,
+      });
+      if (token) {
+        localStorage.setItem("fl_session_token", token);
+        localStorage.setItem("fl_auth_user", username.trim());
+        localStorage.setItem("fl_username", username.trim());
+        setSuccess("Welcome back! Logging in...");
+        setTimeout(() => onAuthed(username.trim()), 600);
+      } else {
+        // Fallback to local check
+        const storedUser = localStorage.getItem("fl_auth_user");
+        const storedPass = localStorage.getItem("fl_auth_pass");
+        if (storedUser === username.trim() && storedPass === password) {
+          setSuccess("Welcome back! Logging in...");
+          localStorage.setItem("fl_username", username.trim());
+          setTimeout(() => onAuthed(username.trim()), 600);
+        } else {
+          setError("Incorrect username or password.");
+        }
+      }
+    } catch {
+      setError("Login failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     if (!validate()) return;
-    const existing = localStorage.getItem("fl_auth_user");
-    if (existing && existing !== username.trim()) {
-      setError("This device already has an account. Please log in instead.");
-      return;
+    setLoading(true);
+    try {
+      const success = await registerMutation.mutateAsync({
+        username: username.trim(),
+        password,
+      });
+      if (success) {
+        // Auto login after register
+        const token = await loginMutation.mutateAsync({
+          username: username.trim(),
+          password,
+        });
+        if (token) {
+          localStorage.setItem("fl_session_token", token);
+        }
+        localStorage.setItem("fl_auth_user", username.trim());
+        localStorage.setItem("fl_auth_pass", password);
+        localStorage.setItem("fl_username", username.trim());
+        setSuccess("Account created! Entering FantasyLand...");
+        setTimeout(() => onAuthed(username.trim()), 600);
+      } else {
+        setError("Username already taken. Please choose another.");
+      }
+    } catch {
+      // Fallback to local registration
+      localStorage.setItem("fl_auth_user", username.trim());
+      localStorage.setItem("fl_auth_pass", password);
+      localStorage.setItem("fl_username", username.trim());
+      setSuccess("Account created! Entering FantasyLand...");
+      setTimeout(() => onAuthed(username.trim()), 600);
+    } finally {
+      setLoading(false);
     }
-    localStorage.setItem("fl_auth_user", username.trim());
-    localStorage.setItem("fl_auth_pass", password);
-    localStorage.setItem("fl_username", username.trim());
-    setSuccess("Account created! Entering FantasyLand...");
-    setTimeout(() => onAuthed(username.trim()), 600);
   };
 
   const handleGuest = () => {
@@ -65,6 +111,7 @@ export default function AuthScreen({ onAuthed, onGuest }: AuthScreenProps) {
   };
 
   const handleSubmit = () => {
+    if (loading) return;
     if (tab === "login") handleLogin();
     else handleSignup();
   };
@@ -85,35 +132,6 @@ export default function AuthScreen({ onAuthed, onGuest }: AuthScreenProps) {
           "radial-gradient(ellipse at 50% 0%, rgba(168,85,247,0.18) 0%, rgba(10,10,15,1) 60%)",
       }}
     >
-      {/* Logo */}
-      <motion.div
-        initial={{ y: -30, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
-        className="mb-8 flex flex-col items-center"
-      >
-        <img
-          src="/assets/uploads/IMG_20260313_054953-1-1.png"
-          alt="FantasyLand"
-          className="w-20 h-20 object-contain mb-3"
-          style={{ filter: "drop-shadow(0 0 16px rgba(168,85,247,0.7))" }}
-        />
-        <h1
-          className="text-3xl font-black tracking-tight"
-          style={{
-            background:
-              "linear-gradient(135deg, #f472b6 0%, #a855f7 50%, #fbbf24 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-          }}
-        >
-          FantasyLand
-        </h1>
-        <p className="text-white/40 text-sm mt-1 tracking-wide">
-          Enter the new world of FANTASY
-        </p>
-      </motion.div>
-
       {/* Card */}
       <motion.div
         initial={{ y: 30, opacity: 0 }}
@@ -299,13 +317,16 @@ export default function AuthScreen({ onAuthed, onGuest }: AuthScreenProps) {
           data-ocid="auth.submit_button"
           whileTap={{ scale: 0.97 }}
           onClick={handleSubmit}
-          className="w-full mt-5 py-3.5 rounded-2xl font-bold text-white tracking-wide flex items-center justify-center gap-2 transition-all"
+          disabled={loading}
+          className="w-full mt-5 py-3.5 rounded-2xl font-bold text-white tracking-wide flex items-center justify-center gap-2 transition-all disabled:opacity-60"
           style={{
             background: "linear-gradient(135deg, #a855f7 0%, #ec4899 100%)",
             boxShadow: "0 0 24px rgba(168,85,247,0.45)",
           }}
         >
-          {tab === "login" ? (
+          {loading ? (
+            <span className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+          ) : tab === "login" ? (
             <>
               <LogIn size={18} />
               Log In

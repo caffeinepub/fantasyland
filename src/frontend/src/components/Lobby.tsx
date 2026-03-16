@@ -1,8 +1,15 @@
 import { Home, Play, Search, Send, Sparkles, User } from "lucide-react";
 import { useState } from "react";
 import type { Room } from "../App";
-import { useOnlineCount } from "../hooks/useQueries";
+import { useTheme } from "../contexts/ThemeContext";
+import {
+  useOnlineCount,
+  usePendingFriendRequests,
+  useRespondToFriendRequest,
+} from "../hooks/useQueries";
+import HeaderMenu from "./HeaderMenu";
 import PrivateRoomModal from "./PrivateRoomModal";
+import QuickDMModal from "./QuickDMModal";
 import RoleplayEntryModal from "./RoleplayEntryModal";
 import UsernameTopBar from "./UsernameTopBar";
 
@@ -10,6 +17,7 @@ interface Props {
   username: string;
   onEnterRoom: (room: Room) => void;
   onRename: () => void;
+  onLogout?: () => void;
 }
 
 function OnlineBadge({ roomId }: { roomId: string }) {
@@ -70,7 +78,7 @@ const rooms = [
   },
   {
     id: "private" as const,
-    countId: "private-meta",
+    countId: "",
     title: "Private Room",
     desc: "Create or join with a secret code",
     emoji: "🔒",
@@ -127,13 +135,34 @@ const rooms = [
 
 const FANTASY_LETTERS = "FantasyLand".split("").map((char, i) => ({ char, i }));
 
-export default function Lobby({ username, onEnterRoom, onRename }: Props) {
+export default function Lobby({
+  username,
+  onEnterRoom,
+  onRename,
+  onLogout,
+}: Props) {
   const [showPrivate, setShowPrivate] = useState(false);
   const [showRoleplay, setShowRoleplay] = useState(false);
+  const [showDM, setShowDM] = useState(false);
+  const { tokens } = useTheme();
   const [hoveredRoom, setHoveredRoom] = useState<string | null>(null);
   const [activeNavTab, setActiveNavTab] = useState<
     "home" | "reels" | "direct" | "search" | "profile"
   >("home");
+
+  const { data: pendingFriendReqs = [] } = usePendingFriendRequests(username);
+  const respondMutation = useRespondToFriendRequest();
+  const pendingIncoming = pendingFriendReqs.filter(
+    (r) => r.to === username && r.status === ("pending" as any),
+  );
+
+  const handleAccept = (fromUser: string) => {
+    respondMutation.mutateAsync({ fromUser, toUser: username, accept: true });
+  };
+
+  const handleDecline = (fromUser: string) => {
+    respondMutation.mutateAsync({ fromUser, toUser: username, accept: false });
+  };
 
   const handleRoomClick = (id: string) => {
     if (id === "private") setShowPrivate(true);
@@ -150,8 +179,9 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
     <div
       className="min-h-screen stars-bg relative overflow-hidden pb-20"
       style={{
-        background:
-          "radial-gradient(ellipse at 30% 20%, oklch(0.14 0.06 280) 0%, oklch(0.09 0.03 260) 40%, oklch(0.07 0.02 280) 100%)",
+        background: tokens.isDark
+          ? "radial-gradient(ellipse at 30% 20%, oklch(0.14 0.06 280) 0%, oklch(0.09 0.03 260) 40%, oklch(0.07 0.02 280) 100%)"
+          : tokens.bg,
       }}
     >
       <UsernameTopBar username={username} onRename={onRename} />
@@ -195,9 +225,21 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
 
       {/* Header */}
       <header
-        className="relative z-10 flex items-center justify-between px-6 py-4 border-b"
-        style={{ borderColor: "oklch(0.22 0.06 280 / 0.5)" }}
+        className="relative z-10 flex items-center justify-between px-4 py-4 border-b"
+        style={{ borderColor: tokens.border, background: tokens.headerBg }}
       >
+        {/* Left: HeaderMenu (unified menu button) */}
+        <HeaderMenu
+          username={username}
+          onStartDm={() => setShowDM(true)}
+          onRename={onRename}
+          onLogout={onLogout}
+          pendingRequests={pendingFriendReqs}
+          onAccept={handleAccept}
+          onDecline={handleDecline}
+        />
+
+        {/* Center: FantasyLand title */}
         <div className="flex items-center gap-0">
           {FANTASY_LETTERS.map(({ char, i }) => (
             <span
@@ -216,17 +258,19 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
             </span>
           ))}
         </div>
+
+        {/* Right: Username badge */}
         <div
-          className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
           style={{
-            background: "oklch(0.15 0.04 275)",
+            background: tokens.isDark ? "oklch(0.15 0.04 275)" : tokens.surface,
             border: "1px solid oklch(0.65 0.28 305 / 0.3)",
             color: "oklch(0.78 0.15 85)",
             boxShadow: "0 0 12px oklch(0.65 0.28 305 / 0.15)",
           }}
         >
-          <Sparkles size={14} />
-          <span>{username}</span>
+          <Sparkles size={12} />
+          <span className="max-w-[80px] truncate">{username}</span>
         </div>
       </header>
 
@@ -237,7 +281,9 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
           <div className="text-center mb-10">
             <p
               className="text-lg font-medium mb-1"
-              style={{ color: "oklch(0.78 0.15 85)" }}
+              style={{
+                color: tokens.isDark ? "oklch(0.78 0.15 85)" : tokens.textMuted,
+              }}
             >
               Welcome the new world of
             </p>
@@ -269,8 +315,12 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
                   className="group relative rounded-xl p-6 text-left cursor-pointer transition-all duration-300 overflow-hidden"
                   style={{
                     background: isHovered
-                      ? `radial-gradient(ellipse at 30% 30%, ${room.glow}18 0%, oklch(0.12 0.035 275) 60%)`
-                      : "oklch(0.12 0.035 275)",
+                      ? tokens.isDark
+                        ? `radial-gradient(ellipse at 30% 30%, ${room.glow}18 0%, oklch(0.12 0.035 275) 60%)`
+                        : tokens.surface
+                      : tokens.isDark
+                        ? "oklch(0.12 0.035 275)"
+                        : tokens.surface,
                     border: `1px solid ${
                       isHovered ? room.border : "oklch(0.22 0.06 280 / 0.5)"
                     }`,
@@ -311,14 +361,11 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
                   </div>
                   <h3
                     className="font-display text-xl font-bold mb-1"
-                    style={{ color: "oklch(0.92 0.04 280)" }}
+                    style={{ color: tokens.text }}
                   >
                     {room.title}
                   </h3>
-                  <p
-                    className="text-sm"
-                    style={{ color: "oklch(0.6 0.06 280)" }}
-                  >
+                  <p className="text-sm" style={{ color: tokens.textMuted }}>
                     {room.desc}
                   </p>
                   {isHovered && (
@@ -339,7 +386,7 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
 
       <footer
         className="relative z-10 text-center py-6 text-xs"
-        style={{ color: "oklch(0.45 0.04 280)" }}
+        style={{ color: tokens.textMuted }}
       >
         © {new Date().getFullYear()}. Built with ❤️ using{" "}
         <a
@@ -384,6 +431,7 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
               setActiveNavTab(tab.id);
               if (tab.id === "reels") onEnterRoom({ type: "social-media" });
               if (tab.id === "profile") onEnterRoom({ type: "profile" });
+              if (tab.id === "direct") onEnterRoom({ type: "direct" });
             }}
             className="flex flex-col items-center gap-0.5 transition-all active:scale-90"
             style={{
@@ -412,6 +460,18 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
               >
                 {username[0]?.toUpperCase()}
               </div>
+            ) : tab.id === "direct" ? (
+              <div className="relative">
+                {tab.icon}
+                {pendingIncoming.length > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
+                    style={{ background: "oklch(0.6 0.28 20)", color: "white" }}
+                  >
+                    {pendingIncoming.length > 9 ? "9+" : pendingIncoming.length}
+                  </span>
+                )}
+              </div>
             ) : (
               tab.icon
             )}
@@ -419,6 +479,15 @@ export default function Lobby({ username, onEnterRoom, onRename }: Props) {
         ))}
       </nav>
 
+      <QuickDMModal
+        currentUsername={username}
+        open={showDM}
+        onClose={() => setShowDM(false)}
+        onStartDm={(roomId, targetUsername) => {
+          setShowDM(false);
+          onEnterRoom({ type: "dm", roomId, friendName: targetUsername });
+        }}
+      />
       {showPrivate && (
         <PrivateRoomModal
           onClose={() => setShowPrivate(false)}

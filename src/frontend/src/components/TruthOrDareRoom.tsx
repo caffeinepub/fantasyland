@@ -60,7 +60,7 @@ export default function TruthOrDareRoom({ username, onBack }: Props) {
     setLastResult(result);
     setShowResultModal(true);
     const msg = `🎲 [${isTruth ? "TRUTH" : "DARE"}] ${picked}`;
-    await actor.sendMessage("truth-dare", username, msg);
+    await actor.sendMessage("truth-dare", username, msg, null);
     await qc.invalidateQueries({ queryKey: ["messages", "truth-dare"] });
     setSpinning(false);
   };

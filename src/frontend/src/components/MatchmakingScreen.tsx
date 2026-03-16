@@ -35,12 +35,14 @@ export default function MatchmakingScreen({
 
   useEffect(() => {
     if (matchResult && typeof matchResult === "string") {
+      sessionStorage.setItem("justMatched", "true");
       onMatched(matchResult);
     } else if (
       matchResult &&
       Array.isArray(matchResult) &&
       matchResult.length > 0
     ) {
+      sessionStorage.setItem("justMatched", "true");
       onMatched(matchResult[0]);
     }
   }, [matchResult, onMatched]);

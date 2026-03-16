@@ -11,14 +11,78 @@ import { IDL } from '@icp-sdk/core/candid';
 export const Message = IDL.Record({
   'username' : IDL.Text,
   'text' : IDL.Text,
+  'voiceUrl' : IDL.Opt(IDL.Text),
   'timestamp' : IDL.Int,
+});
+export const GameStatus = IDL.Variant({
+  'pending' : IDL.Null,
+  'denied' : IDL.Null,
+  'accepted' : IDL.Null,
+});
+export const GameChallengeView = IDL.Record({
+  'id' : IDL.Text,
+  'status' : GameStatus,
+  'timestamp' : IDL.Int,
+  'gameName' : IDL.Text,
+  'roomId' : IDL.Text,
+  'challenger' : IDL.Text,
 });
 
 export const idlService = IDL.Service({
+  'createGameChallenge' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Text],
+      [],
+    ),
   'createPrivateRoom' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'createRPSChallenge' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
+  'getMatchResult' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
   'getMessages' : IDL.Func([IDL.Text], [IDL.Vec(Message)], ['query']),
+  'getOnlineUsers' : IDL.Func([IDL.Text], [IDL.Vec(IDL.Text)], ['query']),
+  'getPendingChallenges' : IDL.Func(
+      [IDL.Text],
+      [IDL.Vec(GameChallengeView)],
+      ['query'],
+    ),
+  'getRPSGame' : IDL.Func(
+      [IDL.Text],
+      [
+        IDL.Opt(
+          IDL.Record({
+            'id' : IDL.Text,
+            'status' : IDL.Text,
+            'result' : IDL.Opt(IDL.Text),
+            'move1' : IDL.Opt(IDL.Text),
+            'move2' : IDL.Opt(IDL.Text),
+            'player1' : IDL.Text,
+            'player2' : IDL.Opt(IDL.Text),
+            'roomId' : IDL.Text,
+          })
+        ),
+      ],
+      ['query'],
+    ),
+  'getRoomOnlineCount' : IDL.Func([IDL.Text], [IDL.Nat], ['query']),
+  'joinMatchmaking' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], []),
+  'joinRPSGame' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+  'leaveMatchmaking' : IDL.Func([IDL.Text], [], []),
+  'login' : IDL.Func([IDL.Text, IDL.Text], [IDL.Opt(IDL.Text)], []),
+  'logout' : IDL.Func([IDL.Text], [], []),
+  'playRPS' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
+  'register' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+  'respondToChallenge' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Bool],
+      [IDL.Bool],
+      [],
+    ),
   'roomExists' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
-  'sendMessage' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
+  'sendMessage' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, IDL.Opt(IDL.Text)],
+      [],
+      [],
+    ),
+  'updatePresence' : IDL.Func([IDL.Text, IDL.Text], [], []),
+  'validateSession' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
 });
 
 export const idlInitArgs = [];
@@ -27,14 +91,78 @@ export const idlFactory = ({ IDL }) => {
   const Message = IDL.Record({
     'username' : IDL.Text,
     'text' : IDL.Text,
+    'voiceUrl' : IDL.Opt(IDL.Text),
     'timestamp' : IDL.Int,
+  });
+  const GameStatus = IDL.Variant({
+    'pending' : IDL.Null,
+    'denied' : IDL.Null,
+    'accepted' : IDL.Null,
+  });
+  const GameChallengeView = IDL.Record({
+    'id' : IDL.Text,
+    'status' : GameStatus,
+    'timestamp' : IDL.Int,
+    'gameName' : IDL.Text,
+    'roomId' : IDL.Text,
+    'challenger' : IDL.Text,
   });
   
   return IDL.Service({
+    'createGameChallenge' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Text],
+        [],
+      ),
     'createPrivateRoom' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'createRPSChallenge' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
+    'getMatchResult' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
     'getMessages' : IDL.Func([IDL.Text], [IDL.Vec(Message)], ['query']),
+    'getOnlineUsers' : IDL.Func([IDL.Text], [IDL.Vec(IDL.Text)], ['query']),
+    'getPendingChallenges' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(GameChallengeView)],
+        ['query'],
+      ),
+    'getRPSGame' : IDL.Func(
+        [IDL.Text],
+        [
+          IDL.Opt(
+            IDL.Record({
+              'id' : IDL.Text,
+              'status' : IDL.Text,
+              'result' : IDL.Opt(IDL.Text),
+              'move1' : IDL.Opt(IDL.Text),
+              'move2' : IDL.Opt(IDL.Text),
+              'player1' : IDL.Text,
+              'player2' : IDL.Opt(IDL.Text),
+              'roomId' : IDL.Text,
+            })
+          ),
+        ],
+        ['query'],
+      ),
+    'getRoomOnlineCount' : IDL.Func([IDL.Text], [IDL.Nat], ['query']),
+    'joinMatchmaking' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], []),
+    'joinRPSGame' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+    'leaveMatchmaking' : IDL.Func([IDL.Text], [], []),
+    'login' : IDL.Func([IDL.Text, IDL.Text], [IDL.Opt(IDL.Text)], []),
+    'logout' : IDL.Func([IDL.Text], [], []),
+    'playRPS' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
+    'register' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+    'respondToChallenge' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Bool],
+        [IDL.Bool],
+        [],
+      ),
     'roomExists' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
-    'sendMessage' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [], []),
+    'sendMessage' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Opt(IDL.Text)],
+        [],
+        [],
+      ),
+    'updatePresence' : IDL.Func([IDL.Text, IDL.Text], [], []),
+    'validateSession' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
   });
 };
 

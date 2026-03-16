@@ -82,6 +82,7 @@ export default function CameraModal({
 
   const [mode, setMode] = useState<Mode>("POST");
   const [activeFilter, setActiveFilter] = useState(0);
+  const [isFrontCamera, setIsFrontCamera] = useState(true);
   const [flashOn, setFlashOn] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordProgress, setRecordProgress] = useState(0);
@@ -131,6 +132,7 @@ export default function CameraModal({
         await videoRef.current.play().catch(() => {});
       }
       setIsActive(true);
+      setIsFrontCamera(facingModeRef.current === "user");
       setIsLoading(false);
     } catch {
       // Try fallback facing mode
@@ -148,6 +150,7 @@ export default function CameraModal({
           await videoRef.current.play().catch(() => {});
         }
         setIsActive(true);
+        setIsFrontCamera(facingModeRef.current === "user");
         setIsLoading(false);
       } catch (err2) {
         const msg = err2 instanceof Error ? err2.message : "Camera unavailable";
@@ -537,7 +540,10 @@ export default function CameraModal({
                   playsInline
                   muted
                   className="w-full h-full object-cover"
-                  style={{ filter: currentFilter }}
+                  style={{
+                    filter: currentFilter,
+                    transform: isFrontCamera ? "scaleX(-1)" : "none",
+                  }}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">

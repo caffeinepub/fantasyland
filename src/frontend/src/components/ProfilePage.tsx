@@ -1,10 +1,21 @@
-import { ArrowLeft, Check, Lock, Pencil, Unlock, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  Lock,
+  MessageSquarePlus,
+  Pencil,
+  Unlock,
+  X,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { getOrCreateUID } from "../utils/uid";
 
 interface ProfilePageProps {
   username: string;
   onBack: () => void;
+  onStartDm?: () => void;
 }
 
 const AVATAR_GRADIENTS = [
@@ -21,7 +32,6 @@ function getInitials(name: string): string {
 }
 
 function getDefaultStats() {
-  // Seed consistent random values per username stored in localStorage
   const storedFollowers = localStorage.getItem("fl_followers");
   const storedLikes = localStorage.getItem("fl_likes");
   const followers = storedFollowers
@@ -46,7 +56,11 @@ function getPostCount(): number {
   }
 }
 
-export default function ProfilePage({ username, onBack }: ProfilePageProps) {
+export default function ProfilePage({
+  username,
+  onBack,
+  onStartDm,
+}: ProfilePageProps) {
   const [bio, setBio] = useState(() => localStorage.getItem("fl_bio") || "");
   const [editingBio, setEditingBio] = useState(false);
   const [draftBio, setDraftBio] = useState("");
@@ -59,6 +73,15 @@ export default function ProfilePage({ username, onBack }: ProfilePageProps) {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [postCount, setPostCount] = useState(0);
   const [stats, setStats] = useState({ followers: 0, likes: 0 });
+  const [uidCopied, setUidCopied] = useState(false);
+  const uid = getOrCreateUID();
+
+  const copyUID = () => {
+    navigator.clipboard.writeText(`#${uid}`).then(() => {
+      setUidCopied(true);
+      setTimeout(() => setUidCopied(false), 2000);
+    });
+  };
 
   useEffect(() => {
     setPostCount(getPostCount());
@@ -171,7 +194,6 @@ export default function ProfilePage({ username, onBack }: ProfilePageProps) {
             >
               {getInitials(username)}
             </button>
-            {/* Color dot indicator */}
             <div
               className="absolute bottom-0 right-0 w-6 h-6 rounded-full flex items-center justify-center"
               style={{
@@ -183,7 +205,6 @@ export default function ProfilePage({ username, onBack }: ProfilePageProps) {
             </div>
           </div>
 
-          {/* Color picker */}
           {showColorPicker && (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
@@ -213,7 +234,6 @@ export default function ProfilePage({ username, onBack }: ProfilePageProps) {
             </motion.div>
           )}
 
-          {/* Username */}
           <h1
             className="font-display text-2xl font-black mb-1"
             style={{
@@ -227,7 +247,6 @@ export default function ProfilePage({ username, onBack }: ProfilePageProps) {
             {username}
           </h1>
 
-          {/* Privacy badge */}
           <span
             className="text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1"
             style={{
@@ -243,6 +262,47 @@ export default function ProfilePage({ username, onBack }: ProfilePageProps) {
             {isPrivate ? <Lock size={10} /> : <Unlock size={10} />}
             {isPrivate ? "Private Profile" : "Public Profile"}
           </span>
+
+          {/* UID Badge */}
+          <div className="flex items-center gap-2 mt-2">
+            <span
+              className="text-xs font-mono px-3 py-1 rounded-full"
+              style={{
+                background: "oklch(0.15 0.06 305 / 0.4)",
+                color: "oklch(0.75 0.18 305)",
+                border: "1px solid oklch(0.65 0.28 305 / 0.25)",
+              }}
+            >
+              Your ID: #{uid}
+            </span>
+            <button
+              type="button"
+              data-ocid="profile.copy_uid.button"
+              onClick={copyUID}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all active:scale-90"
+              style={{
+                background: uidCopied
+                  ? "oklch(0.55 0.2 140 / 0.2)"
+                  : "oklch(0.65 0.28 305 / 0.12)",
+                color: uidCopied
+                  ? "oklch(0.7 0.2 140)"
+                  : "oklch(0.75 0.22 305)",
+                border: uidCopied
+                  ? "1px solid oklch(0.55 0.2 140 / 0.3)"
+                  : "1px solid oklch(0.65 0.28 305 / 0.25)",
+              }}
+            >
+              {uidCopied ? (
+                <>
+                  <Check size={10} /> Copied!
+                </>
+              ) : (
+                <>
+                  <Copy size={10} /> Copy
+                </>
+              )}
+            </button>
+          </div>
         </motion.div>
 
         {/* Stats Row */}
@@ -386,7 +446,7 @@ export default function ProfilePage({ username, onBack }: ProfilePageProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.3 }}
           onClick={startEditBio}
-          className="w-full py-3.5 rounded-2xl text-sm font-bold tracking-wide flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+          className="w-full py-3.5 rounded-2xl text-sm font-bold tracking-wide flex items-center justify-center gap-2 transition-all active:scale-[0.98] mb-3"
           style={{
             background: "oklch(0.15 0.04 275)",
             border: "1px solid oklch(0.65 0.28 305 / 0.4)",
@@ -397,6 +457,29 @@ export default function ProfilePage({ username, onBack }: ProfilePageProps) {
           <Pencil size={15} />
           Edit Profile
         </motion.button>
+
+        {/* Send Private Message button */}
+        {onStartDm && (
+          <motion.button
+            type="button"
+            data-ocid="profile.send_dm.button"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.35 }}
+            onClick={onStartDm}
+            className="w-full py-3.5 rounded-2xl text-sm font-bold tracking-wide flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.65 0.28 305 / 0.2), oklch(0.78 0.15 85 / 0.2))",
+              border: "1px solid oklch(0.65 0.28 305 / 0.5)",
+              color: "oklch(0.88 0.2 330)",
+              boxShadow: "0 0 20px oklch(0.65 0.28 305 / 0.12)",
+            }}
+          >
+            <MessageSquarePlus size={15} />
+            Send Private Message
+          </motion.button>
+        )}
       </main>
 
       <footer

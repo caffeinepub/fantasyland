@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import Logo3D from "./Logo3D";
 
 const ALL_NAMES = [
   "Someone",
@@ -122,9 +121,6 @@ export default function UsernamePicker({ onConfirm }: Props) {
         }}
       >
         <div className="text-center mb-8">
-          <div className="mb-4 flex justify-center">
-            <Logo3D size={72} />
-          </div>
           <h2
             className="font-display text-3xl font-black mb-2"
             style={{

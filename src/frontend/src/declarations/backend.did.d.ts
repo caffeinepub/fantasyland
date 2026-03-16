@@ -10,16 +10,62 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface GameChallengeView {
+  'id' : string,
+  'status' : GameStatus,
+  'timestamp' : bigint,
+  'gameName' : string,
+  'roomId' : string,
+  'challenger' : string,
+}
+export type GameStatus = { 'pending' : null } |
+  { 'denied' : null } |
+  { 'accepted' : null };
 export interface Message {
   'username' : string,
   'text' : string,
+  'voiceUrl' : [] | [string],
   'timestamp' : bigint,
 }
 export interface _SERVICE {
+  'createGameChallenge' : ActorMethod<[string, string, string], string>,
   'createPrivateRoom' : ActorMethod<[string], boolean>,
+  'createRPSChallenge' : ActorMethod<[string, string], string>,
+  'getMatchResult' : ActorMethod<[string], [] | [string]>,
   'getMessages' : ActorMethod<[string], Array<Message>>,
+  'getOnlineUsers' : ActorMethod<[string], Array<string>>,
+  'getPendingChallenges' : ActorMethod<[string], Array<GameChallengeView>>,
+  'getRPSGame' : ActorMethod<
+    [string],
+    [] | [
+      {
+        'id' : string,
+        'status' : string,
+        'result' : [] | [string],
+        'move1' : [] | [string],
+        'move2' : [] | [string],
+        'player1' : string,
+        'player2' : [] | [string],
+        'roomId' : string,
+      }
+    ]
+  >,
+  'getRoomOnlineCount' : ActorMethod<[string], bigint>,
+  'joinMatchmaking' : ActorMethod<[string], [] | [string]>,
+  'joinRPSGame' : ActorMethod<[string, string], boolean>,
+  'leaveMatchmaking' : ActorMethod<[string], undefined>,
+  'login' : ActorMethod<[string, string], [] | [string]>,
+  'logout' : ActorMethod<[string], undefined>,
+  'playRPS' : ActorMethod<[string, string, string], undefined>,
+  'register' : ActorMethod<[string, string], boolean>,
+  'respondToChallenge' : ActorMethod<[string, string, boolean], boolean>,
   'roomExists' : ActorMethod<[string], boolean>,
-  'sendMessage' : ActorMethod<[string, string, string], undefined>,
+  'sendMessage' : ActorMethod<
+    [string, string, string, [] | [string]],
+    undefined
+  >,
+  'updatePresence' : ActorMethod<[string, string], undefined>,
+  'validateSession' : ActorMethod<[string], [] | [string]>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

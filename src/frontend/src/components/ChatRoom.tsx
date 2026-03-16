@@ -1,3 +1,42 @@
+// Speech Recognition type declarations
+interface SpeechRecognitionResult {
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+interface SpeechRecognitionAlternative {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+interface SpeechRecognitionEvent extends Event {
+  readonly results: SpeechRecognitionResultList;
+  readonly resultIndex: number;
+}
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+}
+interface ISpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+}
+declare global {
+  interface Window {
+    SpeechRecognition: new () => ISpeechRecognition;
+    webkitSpeechRecognition: new () => ISpeechRecognition;
+  }
+}
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -5,30 +44,46 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Camera,
+  Check,
   Gamepad2,
+  MessageSquarePlus,
+  Mic,
   Paperclip,
   Pencil,
   Smile,
   Sparkles,
+  Sword,
+  UserPlus,
   Users,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useTheme } from "../contexts/ThemeContext";
+import { playMessageSound } from "../hooks/useNotificationSound";
 import { usePresence } from "../hooks/usePresence";
 import {
+  useCreateGameChallenge,
+  useFriendRequestStatus,
   useJoinRPSGame,
   useMessages,
   useOnlineUsers,
+  usePendingChallenges,
+  useRespondToChallenge,
+  useSendFriendRequest,
   useSendMessage,
 } from "../hooks/useQueries";
 import CameraModal from "./CameraModal";
 import NumberGuess from "./NumberGuess";
+import QuickDMModal from "./QuickDMModal";
 import RPSGame from "./RPSGame";
+import ThemeToggle from "./ThemeToggle";
 import TicTacToe from "./TicTacToe";
 import UsernameTopBar from "./UsernameTopBar";
 
 interface Props {
+  isStranger?: boolean;
   roomId: string;
   roomName: string;
   roomEmoji: string;
@@ -36,6 +91,7 @@ interface Props {
   onBack: () => void;
   onRename?: () => void;
   extraPanel?: React.ReactNode;
+  onStartDm?: (roomId: string, friendName: string) => void;
 }
 
 function formatTime(ts: bigint): string {
@@ -226,12 +282,17 @@ export default function ChatRoom({
   username,
   onBack,
   onRename: _onRename,
+  isStranger = false,
   extraPanel,
+  onStartDm,
 }: Props) {
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [showDM, setShowDM] = useState(false);
+  const { tokens } = useTheme();
   const [showMembers, setShowMembers] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const prevMsgCount = useRef(0);
 
   // Reply/tag system
   const [replyTo, setReplyTo] = useState<{
@@ -252,7 +313,6 @@ export default function ChatRoom({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Games menu & active game
-  const [showGamesMenu, setShowGamesMenu] = useState(false);
   const [activeGame, setActiveGame] = useState<"rps" | "ttt" | "ng" | null>(
     null,
   );
@@ -263,8 +323,75 @@ export default function ChatRoom({
   // Camera modal
   const [showCameraModal, setShowCameraModal] = useState(false);
 
+  // Voice recording (hold to record)
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
+      const mediaRecorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const voiceUrl = reader.result as string;
+          if (!isAiBot) {
+            try {
+              await sendMutation.mutateAsync({ username, text: "", voiceUrl });
+            } catch {
+              // silent
+            }
+          }
+        };
+        reader.readAsDataURL(blob);
+        for (const t of stream.getTracks()) t.stop();
+        recordingStreamRef.current = null;
+      };
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch {
+      toast.error("Could not access microphone");
+    }
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setIsRecording(false);
+  };
+
+  // Show "stranger connected" banner for 1v1 rooms
+  useEffect(() => {
+    if (isStranger && sessionStorage.getItem("justMatched") === "true") {
+      sessionStorage.removeItem("justMatched");
+      setShowStrangerBanner(true);
+      const t = setTimeout(() => setShowStrangerBanner(false), 3500);
+      return () => clearTimeout(t);
+    }
+  }, [isStranger]);
+
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      mediaRecorderRef.current?.stop();
+      for (const t of recordingStreamRef.current?.getTracks() ?? []) t.stop();
+    };
+  }, []);
+
   // AI Bot mode
   const isAiBot = roomId.startsWith("ai-bot-");
+  const [showStrangerBanner, setShowStrangerBanner] = useState(false);
+  const [strangerName, setStrangerName] = useState("A stranger");
+  // Friend request popup
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [botMessages, setBotMessages] = useState<
     Array<{ username: string; text: string; timestamp: bigint; key: string }>
   >([]);
@@ -287,6 +414,7 @@ export default function ChatRoom({
   );
   const onlineUsers = isAiBot ? [username, "FantasyBot"] : backendOnlineUsers;
   const qc = useQueryClient();
+  const sendFriendReqMutation = useSendFriendRequest();
 
   useEffect(() => {
     if (!isAiBot) return;
@@ -301,6 +429,79 @@ export default function ChatRoom({
   }, [isAiBot]);
 
   usePresence(isAiBot ? "" : roomId, username);
+
+  // Track stranger's name from online users
+  useEffect(() => {
+    if (!isStranger) return;
+    const other = onlineUsers.find((u) => u !== username);
+    if (other) setStrangerName(other);
+  }, [isStranger, onlineUsers, username]);
+
+  // Game challenges
+  const { data: pendingChallenges = [] } = usePendingChallenges(
+    isAiBot ? "__disabled__" : roomId,
+  );
+  const createChallengeMutation = useCreateGameChallenge();
+  const respondChallengeMutation = useRespondToChallenge();
+  const [showChallengeModal, setShowChallengeModal] = useState(false);
+  const [selectedGame, setSelectedGame] = useState<string | null>(null);
+
+  // Filter challenges not created by current user and only pending ones
+  const visibleChallenges = pendingChallenges.filter(
+    (c) => c.challenger !== username && c.status === "pending",
+  );
+
+  const handleAcceptChallenge = async (id: string, gameName: string) => {
+    try {
+      await respondChallengeMutation.mutateAsync({
+        challengeId: id,
+        username,
+        accept: true,
+      });
+      toast.success(`Challenge accepted! Starting ${gameName}...`);
+    } catch {
+      toast.error("Failed to accept challenge");
+    }
+  };
+
+  const handleDenyChallenge = async (id: string) => {
+    try {
+      await respondChallengeMutation.mutateAsync({
+        challengeId: id,
+        username,
+        accept: false,
+      });
+    } catch {
+      // silent
+    }
+  };
+
+  const handleSendChallenge = async (gameName: string) => {
+    setShowChallengeModal(false);
+    setSelectedGame(null);
+    try {
+      await createChallengeMutation.mutateAsync({
+        roomId,
+        challenger: username,
+        gameName,
+      });
+      await handleSendSystemMessage(
+        `🎮 ${username} has challenged the room to ${gameName}!`,
+      );
+    } catch {
+      toast.error("Failed to send challenge");
+    }
+  };
+  // Sound notification for new messages
+  useEffect(() => {
+    if (messages.length > prevMsgCount.current) {
+      const latest = messages[messages.length - 1];
+      if (latest && latest.username !== username) {
+        playMessageSound();
+      }
+      prevMsgCount.current = messages.length;
+    }
+  }, [messages, username]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scrollRef is stable
   useEffect(() => {
@@ -433,14 +634,13 @@ export default function ChatRoom({
     setEditText("");
   };
 
-  const handleChallenge = async (type: "rps" | "ttt" | "ng") => {
+  const _handleChallenge = async (type: "rps" | "ttt" | "ng") => {
     const msgs = {
       rps: `🎮 ${username} challenges the room to Rock Paper Scissors! Type /joingame [gameId] after they start a game to join!`,
       ttt: `🎲 ${username} challenges you to Tic Tac Toe! First to reply /accept plays!`,
       ng: `🔢 ${username} challenges the room to Number Guess! Join the game zone to play!`,
     };
     await handleSendSystemMessage(msgs[type]);
-    setShowGamesMenu(false);
   };
 
   return (
@@ -464,11 +664,33 @@ export default function ChatRoom({
 
       {/* Main chat area */}
       <div className="relative z-10 flex flex-col flex-1 min-w-0">
+        {/* Stranger connected banner */}
+        <AnimatePresence>
+          {showStrangerBanner && (
+            <motion.div
+              initial={{ opacity: 0, y: -40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -40 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-3"
+              style={{
+                background:
+                  "linear-gradient(135deg, oklch(0.45 0.25 305 / 0.95) 0%, oklch(0.5 0.22 340 / 0.95) 100%)",
+                boxShadow: "0 4px 32px oklch(0.65 0.28 305 / 0.4)",
+              }}
+            >
+              <span className="text-xl mr-2">🎉</span>
+              <span className="font-bold text-white text-sm tracking-wide">
+                {strangerName} has joined the chat! Say hello! 👋
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <header
           className="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0"
           style={{
-            borderColor: "oklch(0.22 0.06 280 / 0.5)",
-            background: "oklch(0.1 0.03 275 / 0.9)",
+            borderColor: tokens.border,
+            background: tokens.headerBg,
           }}
         >
           <button
@@ -477,9 +699,9 @@ export default function ChatRoom({
             onClick={onBack}
             className="p-2 rounded-lg transition-all duration-200 hover:scale-105"
             style={{
-              background: "oklch(0.15 0.04 275)",
-              border: "1px solid oklch(0.22 0.06 280 / 0.5)",
-              color: "oklch(0.75 0.06 280)",
+              background: tokens.isDark ? "oklch(0.15 0.04 275)" : "#f1f5f9",
+              border: `1px solid ${tokens.border}`,
+              color: tokens.textMuted,
             }}
           >
             <ArrowLeft size={18} />
@@ -489,7 +711,7 @@ export default function ChatRoom({
             <div>
               <h2
                 className="font-display font-bold text-lg"
-                style={{ color: "oklch(0.92 0.04 280)" }}
+                style={{ color: tokens.text }}
               >
                 {roomName}
               </h2>
@@ -501,6 +723,21 @@ export default function ChatRoom({
 
           {/* Right side */}
           <div className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              data-ocid="chatroom.quick_dm.button"
+              onClick={() => setShowDM(true)}
+              className="p-2 rounded-lg transition-all duration-200 hover:scale-105"
+              style={{
+                background: tokens.isDark ? "oklch(0.15 0.04 275)" : "#f1f5f9",
+                border: `1px solid ${tokens.border}`,
+                color: tokens.textMuted,
+              }}
+              title="Quick Private Message"
+            >
+              <MessageSquarePlus size={16} />
+            </button>
+            <ThemeToggle ocidPrefix="chatroom" />
             <RPSGame
               roomId={roomId}
               username={username}
@@ -598,16 +835,21 @@ export default function ChatRoom({
                   isOwn ? "flex-row-reverse" : ""
                 }`}
               >
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                <button
+                  type="button"
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 cursor-pointer"
                   style={{
                     background: `${color}30`,
                     border: `1px solid ${color}60`,
                     color,
                   }}
+                  onClick={() => {
+                    if (!isOwn) setSelectedUser(msg.username);
+                  }}
+                  tabIndex={isOwn ? -1 : 0}
                 >
                   {msg.username.charAt(0).toUpperCase()}
-                </div>
+                </button>
                 <div
                   className={`max-w-xs sm:max-w-md ${
                     isOwn ? "items-end" : "items-start"
@@ -818,6 +1060,99 @@ export default function ChatRoom({
             background: "oklch(0.1 0.03 275 / 0.9)",
           }}
         >
+          {/* Pending game challenges banner */}
+          {visibleChallenges.length > 0 && (
+            <div
+              className="mb-2 rounded-xl overflow-hidden"
+              style={{
+                background: "oklch(0.13 0.05 280)",
+                border: "1px solid oklch(0.65 0.22 50 / 0.4)",
+                boxShadow: "0 0 20px oklch(0.65 0.22 50 / 0.1)",
+              }}
+            >
+              {visibleChallenges.slice(0, 2).map((challenge, idx) => (
+                <div
+                  key={challenge.id}
+                  data-ocid={`chat.challenge.item.${idx + 1}`}
+                  className="flex items-center gap-3 px-3 py-2.5"
+                  style={{
+                    borderBottom:
+                      idx < visibleChallenges.slice(0, 2).length - 1
+                        ? "1px solid oklch(0.22 0.06 280 / 0.3)"
+                        : "none",
+                  }}
+                >
+                  <span className="text-lg">🎮</span>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="text-xs font-bold truncate"
+                      style={{ color: "oklch(0.85 0.06 280)" }}
+                    >
+                      <span style={{ color: "oklch(0.78 0.2 55)" }}>
+                        {challenge.challenger}
+                      </span>
+                      {" challenges: "}
+                      <span style={{ color: "oklch(0.85 0.15 305)" }}>
+                        {challenge.gameName}
+                      </span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    data-ocid={`chat.challenge.accept.${idx + 1}`}
+                    onClick={() =>
+                      handleAcceptChallenge(challenge.id, challenge.gameName)
+                    }
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
+                    style={{
+                      background: "oklch(0.45 0.2 145 / 0.2)",
+                      border: "1px solid oklch(0.5 0.2 145 / 0.5)",
+                      color: "oklch(0.78 0.22 145)",
+                    }}
+                  >
+                    <Check size={12} />
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    data-ocid={`chat.challenge.cancel.${idx + 1}`}
+                    onClick={() => handleDenyChallenge(challenge.id)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
+                    style={{
+                      background: "oklch(0.45 0.2 20 / 0.2)",
+                      border: "1px solid oklch(0.5 0.2 20 / 0.5)",
+                      color: "oklch(0.75 0.2 25)",
+                    }}
+                  >
+                    <X size={12} />
+                    Deny
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Recording indicator */}
+          {isRecording && (
+            <div
+              className="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg text-xs"
+              style={{
+                background: "oklch(0.55 0.28 20 / 0.15)",
+                border: "1px solid oklch(0.55 0.28 20 / 0.4)",
+                color: "oklch(0.85 0.2 25)",
+              }}
+            >
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{
+                  background: "oklch(0.65 0.28 20)",
+                  animation: "pulse 0.8s ease-in-out infinite",
+                }}
+              />
+              <span className="font-semibold">Recording… Release to send</span>
+            </div>
+          )}
+
           {/* Reply preview bar */}
           {replyTo && (
             <div
@@ -881,106 +1216,12 @@ export default function ChatRoom({
 
           {/* Input bar */}
           <div
-            className="relative flex items-center gap-2 px-3 py-2 rounded-full"
+            className="relative flex items-center gap-3 px-4 py-3.5 rounded-full"
             style={{
               background: "oklch(0.13 0.04 275)",
               border: "1px solid oklch(0.22 0.06 280 / 0.6)",
             }}
           >
-            {/* Gamepad button */}
-            <div className="relative flex-shrink-0">
-              <button
-                type="button"
-                data-ocid="chat.games.toggle"
-                onClick={() => {
-                  setShowGamesMenu((v) => !v);
-                  setShowEmojiPicker(false);
-                }}
-                className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110"
-                style={{
-                  background: showGamesMenu
-                    ? "oklch(0.55 0.28 305)"
-                    : "oklch(0.45 0.22 305 / 0.8)",
-                  boxShadow: showGamesMenu
-                    ? "0 0 16px oklch(0.65 0.28 305 / 0.6)"
-                    : "none",
-                  color: "oklch(0.97 0.02 280)",
-                }}
-              >
-                <Gamepad2 size={16} />
-              </button>
-
-              {/* Games popup */}
-              <AnimatePresence>
-                {showGamesMenu && (
-                  <motion.div
-                    data-ocid="chat.games.popover"
-                    initial={{ opacity: 0, scale: 0.85, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.85, y: 10 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 28 }}
-                    className="absolute bottom-12 left-0 rounded-2xl p-2 flex flex-col gap-1 min-w-[260px] z-50"
-                    style={{
-                      background: "oklch(0.13 0.05 280)",
-                      border: "1px solid oklch(0.28 0.08 280 / 0.7)",
-                      boxShadow:
-                        "0 8px 32px oklch(0 0 0 / 0.5), 0 0 40px oklch(0.65 0.28 305 / 0.1)",
-                    }}
-                  >
-                    <p
-                      className="text-xs font-bold px-2 py-1 tracking-widest"
-                      style={{ color: "oklch(0.5 0.08 280)" }}
-                    >
-                      GAMES
-                    </p>
-                    {[
-                      {
-                        id: "rps" as const,
-                        label: "Rock Paper Scissors",
-                        emoji: "✊",
-                      },
-                      { id: "ttt" as const, label: "Tic Tac Toe", emoji: "⬜" },
-                      { id: "ng" as const, label: "Number Guess", emoji: "🔢" },
-                    ].map((g) => (
-                      <div key={g.id} className="flex gap-1">
-                        <button
-                          type="button"
-                          data-ocid={`chat.games.${g.id}.button`}
-                          onClick={() => {
-                            setActiveGame(g.id);
-                            setShowGamesMenu(false);
-                          }}
-                          className="flex-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
-                          style={{
-                            background: "oklch(0.17 0.06 280)",
-                            border: "1px solid oklch(0.25 0.07 280 / 0.5)",
-                            color: "oklch(0.85 0.06 280)",
-                          }}
-                        >
-                          <span className="text-lg">{g.emoji}</span>
-                          {g.label}
-                        </button>
-                        <button
-                          type="button"
-                          data-ocid={`chat.games.${g.id}.secondary_button`}
-                          onClick={() => handleChallenge(g.id)}
-                          className="px-2 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
-                          style={{
-                            background: "oklch(0.55 0.22 50 / 0.2)",
-                            border: "1px solid oklch(0.65 0.22 50 / 0.4)",
-                            color: "oklch(0.78 0.2 55)",
-                          }}
-                          title="Send challenge"
-                        >
-                          🎯
-                        </button>
-                      </div>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
             {/* Emoji picker button */}
             <div className="relative flex-shrink-0">
               <button
@@ -988,7 +1229,6 @@ export default function ChatRoom({
                 data-ocid="emoji.toggle"
                 onClick={() => {
                   setShowEmojiPicker((v) => !v);
-                  setShowGamesMenu(false);
                 }}
                 className="flex-shrink-0 p-1.5 rounded-full transition-all hover:scale-110"
                 style={{
@@ -998,7 +1238,7 @@ export default function ChatRoom({
                 }}
                 title="Emoji"
               >
-                <Smile size={20} strokeWidth={1.5} />
+                <Smile size={22} strokeWidth={1.5} />
               </button>
 
               {/* Emoji picker panel */}
@@ -1010,7 +1250,7 @@ export default function ChatRoom({
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.85, y: 10 }}
                     transition={{ type: "spring", stiffness: 400, damping: 28 }}
-                    className="absolute bottom-12 left-0 rounded-2xl p-3 z-50"
+                    className="absolute bottom-14 left-0 rounded-2xl p-3 z-50"
                     style={{
                       background: "oklch(0.13 0.05 280)",
                       border: "1px solid oklch(0.28 0.08 280 / 0.7)",
@@ -1044,9 +1284,11 @@ export default function ChatRoom({
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Message"
+              placeholder={
+                isRecording ? "Recording… Release to send" : "Message"
+              }
               disabled={isSending}
-              className="flex-1 bg-transparent border-none outline-none text-sm min-w-0"
+              className="flex-1 bg-transparent border-none outline-none text-base min-w-0"
               style={{ color: "oklch(0.88 0.03 280)" }}
             />
 
@@ -1078,13 +1320,55 @@ export default function ChatRoom({
               <Camera size={18} strokeWidth={1.5} />
             </button>
 
+            {/* Challenge button */}
+            <button
+              type="button"
+              data-ocid="chat.challenge.open_modal_button"
+              onClick={() => setShowChallengeModal(true)}
+              className="flex-shrink-0 p-1.5 rounded-full transition-all hover:scale-110"
+              style={{ color: "oklch(0.72 0.2 55)" }}
+              title="Challenge room to a game"
+            >
+              <Sword size={18} strokeWidth={1.5} />
+            </button>
+
+            {/* Microphone: hold to record voice message */}
+            <button
+              type="button"
+              data-ocid="chat.mic.toggle"
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onMouseLeave={stopRecording}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                startRecording();
+              }}
+              onTouchEnd={stopRecording}
+              className="flex-shrink-0 p-1.5 rounded-full transition-all hover:scale-110 select-none"
+              style={{
+                color: isRecording
+                  ? "oklch(0.97 0.02 0)"
+                  : "oklch(0.5 0.06 280)",
+                background: isRecording ? "oklch(0.55 0.28 20)" : "transparent",
+                animation: isRecording
+                  ? "pulse 0.8s ease-in-out infinite"
+                  : "none",
+                boxShadow: isRecording
+                  ? "0 0 14px oklch(0.65 0.28 20 / 0.7)"
+                  : "none",
+              }}
+              title="Hold to record voice message"
+            >
+              <Mic size={18} strokeWidth={1.5} />
+            </button>
+
             {/* Send button */}
             <button
               type="button"
               data-ocid="chat.submit_button"
               onClick={handleSend}
               disabled={(!text.trim() && !mediaPreview) || isSending}
-              className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-40"
+              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-40"
               style={{
                 background:
                   text.trim() || mediaPreview
@@ -1118,6 +1402,129 @@ export default function ChatRoom({
         )}
         {activeGame === "ng" && (
           <NumberGuess onClose={() => setActiveGame(null)} />
+        )}
+      </AnimatePresence>
+
+      {/* Challenge Game Picker Modal */}
+      <AnimatePresence>
+        {showChallengeModal && (
+          <motion.div
+            data-ocid="chat.challenge.dialog"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+            style={{ background: "oklch(0 0 0 / 0.6)" }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowChallengeModal(false);
+            }}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              className="w-full max-w-sm rounded-2xl p-5"
+              style={{
+                background: "oklch(0.13 0.05 280)",
+                border: "1px solid oklch(0.28 0.08 280 / 0.7)",
+                boxShadow:
+                  "0 8px 40px oklch(0 0 0 / 0.6), 0 0 40px oklch(0.65 0.22 50 / 0.1)",
+              }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3
+                  className="font-black text-base"
+                  style={{ color: "oklch(0.92 0.04 280)" }}
+                >
+                  🎮 Challenge Room
+                </h3>
+                <button
+                  type="button"
+                  data-ocid="chat.challenge.close_button"
+                  onClick={() => setShowChallengeModal(false)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center"
+                  style={{
+                    background: "oklch(0.18 0.04 280)",
+                    color: "oklch(0.55 0.06 280)",
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <p
+                className="text-xs mb-4"
+                style={{ color: "oklch(0.55 0.06 280)" }}
+              >
+                Pick a game — a challenge will be sent to everyone in the room
+              </p>
+              <div className="flex flex-col gap-2 mb-4">
+                {[
+                  { name: "Rock Paper Scissors", emoji: "✊" },
+                  { name: "Tic Tac Toe", emoji: "⬜" },
+                  { name: "Number Guess", emoji: "🔢" },
+                  { name: "Word Scramble", emoji: "🔤" },
+                  { name: "Trivia Quiz", emoji: "🧠" },
+                ].map((game) => (
+                  <button
+                    key={game.name}
+                    type="button"
+                    data-ocid={`chat.challenge.${game.name.toLowerCase().replace(/ /g, "_")}.button`}
+                    onClick={() =>
+                      setSelectedGame(
+                        selectedGame === game.name ? null : game.name,
+                      )
+                    }
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all hover:scale-[1.01]"
+                    style={{
+                      background:
+                        selectedGame === game.name
+                          ? "oklch(0.65 0.22 50 / 0.2)"
+                          : "oklch(0.17 0.05 280)",
+                      border:
+                        selectedGame === game.name
+                          ? "2px solid oklch(0.65 0.22 50 / 0.6)"
+                          : "1px solid oklch(0.25 0.07 280 / 0.5)",
+                      color:
+                        selectedGame === game.name
+                          ? "oklch(0.85 0.2 55)"
+                          : "oklch(0.82 0.05 280)",
+                    }}
+                  >
+                    <span className="text-xl">{game.emoji}</span>
+                    {game.name}
+                    {selectedGame === game.name && (
+                      <Check
+                        size={16}
+                        className="ml-auto"
+                        style={{ color: "oklch(0.75 0.22 145)" }}
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                data-ocid="chat.challenge.confirm_button"
+                disabled={!selectedGame}
+                onClick={() =>
+                  selectedGame && handleSendChallenge(selectedGame)
+                }
+                className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:scale-105 disabled:opacity-40"
+                style={{
+                  background: selectedGame
+                    ? "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))"
+                    : "oklch(0.2 0.04 280)",
+                  color: "white",
+                  boxShadow: selectedGame
+                    ? "0 0 20px oklch(0.65 0.22 50 / 0.4)"
+                    : "none",
+                }}
+              >
+                Send Challenge 🎯
+              </button>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -1177,73 +1584,199 @@ export default function ChatRoom({
                 <X size={12} />
               </button>
             </div>
-            <ScrollArea className="flex-1">
-              <div className="p-3 space-y-1">
-                {onlineUsers.map((user, i) => {
-                  const color = getUserColor(user);
-                  const isMe = user === username;
-                  return (
-                    <motion.div
-                      key={user}
-                      data-ocid={`chat.members.item.${i + 1}`}
-                      initial={{ x: 20, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg"
-                      style={{
-                        background: isMe
-                          ? "oklch(0.65 0.28 305 / 0.1)"
-                          : "oklch(0.14 0.04 275 / 0.5)",
-                        border: isMe
-                          ? "1px solid oklch(0.65 0.28 305 / 0.3)"
-                          : "1px solid transparent",
-                      }}
-                    >
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 relative"
+            {isStranger ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
+                <span className="text-4xl">👥</span>
+                <p
+                  className="text-2xl font-bold"
+                  style={{ color: "oklch(0.85 0.15 305)" }}
+                >
+                  {onlineUsers.length}
+                </p>
+                <p
+                  className="text-sm text-center"
+                  style={{ color: "oklch(0.55 0.06 280)" }}
+                >
+                  {onlineUsers.length === 1 ? "member" : "members"} online
+                </p>
+              </div>
+            ) : (
+              <ScrollArea className="flex-1">
+                <div className="p-3 space-y-1">
+                  {onlineUsers.map((user, i) => {
+                    const color = getUserColor(user);
+                    const isMe = user === username;
+                    return (
+                      <motion.div
+                        key={user}
+                        data-ocid={`chat.members.item.${i + 1}`}
+                        initial={{ x: 20, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg"
                         style={{
-                          background: `${color}25`,
-                          border: `1px solid ${color}60`,
-                          color,
+                          background: isMe
+                            ? "oklch(0.65 0.28 305 / 0.1)"
+                            : "oklch(0.14 0.04 275 / 0.5)",
+                          border: isMe
+                            ? "1px solid oklch(0.65 0.28 305 / 0.3)"
+                            : "1px solid transparent",
                         }}
                       >
-                        {user.charAt(0).toUpperCase()}
-                        <span
-                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2"
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 relative"
                           style={{
-                            background: "oklch(0.7 0.25 140)",
-                            borderColor: "oklch(0.11 0.04 280)",
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className="text-sm font-medium truncate"
-                          style={{
-                            color: isMe
-                              ? "oklch(0.85 0.15 305)"
-                              : "oklch(0.82 0.05 280)",
+                            background: `${color}25`,
+                            border: `1px solid ${color}60`,
+                            color,
                           }}
                         >
-                          {user}
-                          {isMe && (
-                            <span
-                              className="ml-1.5 text-xs"
-                              style={{ color: "oklch(0.6 0.1 305)" }}
-                            >
-                              (you)
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
+                          {user.charAt(0).toUpperCase()}
+                          <span
+                            className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2"
+                            style={{
+                              background: "oklch(0.7 0.25 140)",
+                              borderColor: "oklch(0.11 0.04 280)",
+                            }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className="text-sm font-medium truncate"
+                            style={{
+                              color: isMe
+                                ? "oklch(0.85 0.15 305)"
+                                : "oklch(0.82 0.05 280)",
+                            }}
+                          >
+                            {user}
+                            {isMe && (
+                              <span
+                                className="ml-1.5 text-xs"
+                                style={{ color: "oklch(0.6 0.1 305)" }}
+                              >
+                                (you)
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            )}
           </motion.aside>
         )}
       </AnimatePresence>
+
+      {/* Friend Request Popup */}
+      {selectedUser && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center pb-32 px-4"
+          onClick={() => setSelectedUser(null)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setSelectedUser(null);
+          }}
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-5 shadow-2xl"
+            style={{
+              background: "oklch(0.13 0.05 280)",
+              border: "1px solid oklch(0.65 0.28 305 / 0.4)",
+              boxShadow: "0 8px 40px oklch(0.65 0.28 305 / 0.25)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold"
+                style={{
+                  background: "oklch(0.65 0.28 305 / 0.2)",
+                  border: "1px solid oklch(0.65 0.28 305 / 0.5)",
+                  color: "oklch(0.85 0.15 305)",
+                }}
+              >
+                {selectedUser.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p
+                  className="font-bold text-base"
+                  style={{ color: "oklch(0.92 0.04 280)" }}
+                >
+                  {selectedUser}
+                </p>
+                <p className="text-xs" style={{ color: "oklch(0.5 0.04 280)" }}>
+                  Send a friend request to chat privately
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                data-ocid="chat.friend_request.submit_button"
+                onClick={async () => {
+                  try {
+                    const ok = await sendFriendReqMutation.mutateAsync({
+                      fromUser: username,
+                      toUser: selectedUser,
+                    });
+                    if (ok) {
+                      toast.success(`Friend request sent to ${selectedUser}!`);
+                    } else {
+                      toast.info(
+                        "Request already sent or you are already friends",
+                      );
+                    }
+                  } catch {
+                    toast.error("Failed to send friend request");
+                  }
+                  setSelectedUser(null);
+                }}
+                disabled={sendFriendReqMutation.isPending}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.65 0.28 305 / 0.3), oklch(0.6 0.25 250 / 0.3))",
+                  border: "1px solid oklch(0.65 0.28 305 / 0.5)",
+                  color: "oklch(0.9 0.08 305)",
+                }}
+              >
+                <UserPlus size={16} />
+                {sendFriendReqMutation.isPending ? "Sending..." : "Add Friend"}
+              </button>
+              <button
+                type="button"
+                data-ocid="chat.friend_request.cancel_button"
+                onClick={() => setSelectedUser(null)}
+                className="px-4 py-2.5 rounded-xl text-sm font-bold"
+                style={{
+                  background: "oklch(0.15 0.04 275)",
+                  border: "1px solid oklch(0.22 0.06 280 / 0.5)",
+                  color: "oklch(0.55 0.04 280)",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <QuickDMModal
+        currentUsername={username}
+        open={showDM}
+        onClose={() => setShowDM(false)}
+        onStartDm={(dmRoomId, targetUsername) => {
+          setShowDM(false);
+          if (onStartDm) {
+            onStartDm(dmRoomId, targetUsername);
+          } else {
+            onBack();
+          }
+        }}
+      />
     </div>
   );
 }

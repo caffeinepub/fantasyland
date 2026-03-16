@@ -92,16 +92,71 @@ export class ExternalBlob {
 export interface Message {
     username: string;
     text: string;
+    voiceUrl?: string;
     timestamp: bigint;
 }
-export interface backendInterface {
-    createPrivateRoom(code: string): Promise<boolean>;
-    getMessages(roomId: string): Promise<Array<Message>>;
-    roomExists(code: string): Promise<boolean>;
-    sendMessage(roomId: string, username: string, message: string): Promise<void>;
+export interface GameChallengeView {
+    id: string;
+    status: GameStatus;
+    timestamp: bigint;
+    gameName: string;
+    roomId: string;
+    challenger: string;
 }
+export enum GameStatus {
+    pending = "pending",
+    denied = "denied",
+    accepted = "accepted"
+}
+export interface backendInterface {
+    createGameChallenge(roomId: string, challenger: string, gameName: string): Promise<string>;
+    createPrivateRoom(code: string): Promise<boolean>;
+    createRPSChallenge(roomId: string, challenger: string): Promise<string>;
+    getMatchResult(username: string): Promise<string | null>;
+    getMessages(roomId: string): Promise<Array<Message>>;
+    getOnlineUsers(roomId: string): Promise<Array<string>>;
+    getPendingChallenges(roomId: string): Promise<Array<GameChallengeView>>;
+    getRPSGame(gameId: string): Promise<{
+        id: string;
+        status: string;
+        result?: string;
+        move1?: string;
+        move2?: string;
+        player1: string;
+        player2?: string;
+        roomId: string;
+    } | null>;
+    getRoomOnlineCount(roomId: string): Promise<bigint>;
+    joinMatchmaking(username: string): Promise<string | null>;
+    joinRPSGame(gameId: string, username: string): Promise<boolean>;
+    leaveMatchmaking(username: string): Promise<void>;
+    login(username: string, password: string): Promise<string | null>;
+    logout(token: string): Promise<void>;
+    playRPS(gameId: string, username: string, move: string): Promise<void>;
+    register(username: string, password: string): Promise<boolean>;
+    respondToChallenge(challengeId: string, _username: string, accept: boolean): Promise<boolean>;
+    roomExists(code: string): Promise<boolean>;
+    sendMessage(roomId: string, username: string, message: string, voiceUrl: string | null): Promise<void>;
+    updatePresence(roomId: string, username: string): Promise<void>;
+    validateSession(token: string): Promise<string | null>;
+}
+import type { GameChallengeView as _GameChallengeView, GameStatus as _GameStatus, Message as _Message } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
+    async createGameChallenge(arg0: string, arg1: string, arg2: string): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createGameChallenge(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createGameChallenge(arg0, arg1, arg2);
+            return result;
+        }
+    }
     async createPrivateRoom(arg0: string): Promise<boolean> {
         if (this.processError) {
             try {
@@ -116,17 +171,222 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async getMessages(arg0: string): Promise<Array<Message>> {
+    async createRPSChallenge(arg0: string, arg1: string): Promise<string> {
         if (this.processError) {
             try {
-                const result = await this.actor.getMessages(arg0);
+                const result = await this.actor.createRPSChallenge(arg0, arg1);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
+            const result = await this.actor.createRPSChallenge(arg0, arg1);
+            return result;
+        }
+    }
+    async getMatchResult(arg0: string): Promise<string | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMatchResult(arg0);
+                return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMatchResult(arg0);
+            return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getMessages(arg0: string): Promise<Array<Message>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMessages(arg0);
+                return from_candid_vec_n2(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
             const result = await this.actor.getMessages(arg0);
+            return from_candid_vec_n2(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getOnlineUsers(arg0: string): Promise<Array<string>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getOnlineUsers(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getOnlineUsers(arg0);
+            return result;
+        }
+    }
+    async getPendingChallenges(arg0: string): Promise<Array<GameChallengeView>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPendingChallenges(arg0);
+                return from_candid_vec_n5(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPendingChallenges(arg0);
+            return from_candid_vec_n5(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getRPSGame(arg0: string): Promise<{
+        id: string;
+        status: string;
+        result?: string;
+        move1?: string;
+        move2?: string;
+        player1: string;
+        player2?: string;
+        roomId: string;
+    } | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getRPSGame(arg0);
+                return from_candid_opt_n10(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getRPSGame(arg0);
+            return from_candid_opt_n10(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getRoomOnlineCount(arg0: string): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getRoomOnlineCount(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getRoomOnlineCount(arg0);
+            return result;
+        }
+    }
+    async joinMatchmaking(arg0: string): Promise<string | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.joinMatchmaking(arg0);
+                return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.joinMatchmaking(arg0);
+            return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async joinRPSGame(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.joinRPSGame(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.joinRPSGame(arg0, arg1);
+            return result;
+        }
+    }
+    async leaveMatchmaking(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.leaveMatchmaking(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.leaveMatchmaking(arg0);
+            return result;
+        }
+    }
+    async login(arg0: string, arg1: string): Promise<string | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.login(arg0, arg1);
+                return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.login(arg0, arg1);
+            return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async logout(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.logout(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.logout(arg0);
+            return result;
+        }
+    }
+    async playRPS(arg0: string, arg1: string, arg2: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.playRPS(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.playRPS(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async register(arg0: string, arg1: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.register(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.register(arg0, arg1);
+            return result;
+        }
+    }
+    async respondToChallenge(arg0: string, arg1: string, arg2: boolean): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.respondToChallenge(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.respondToChallenge(arg0, arg1, arg2);
             return result;
         }
     }
@@ -144,20 +404,171 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async sendMessage(arg0: string, arg1: string, arg2: string): Promise<void> {
+    async sendMessage(arg0: string, arg1: string, arg2: string, arg3: string | null): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.sendMessage(arg0, arg1, arg2);
+                const result = await this.actor.sendMessage(arg0, arg1, arg2, to_candid_opt_n12(this._uploadFile, this._downloadFile, arg3));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.sendMessage(arg0, arg1, arg2);
+            const result = await this.actor.sendMessage(arg0, arg1, arg2, to_candid_opt_n12(this._uploadFile, this._downloadFile, arg3));
             return result;
         }
     }
+    async updatePresence(arg0: string, arg1: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updatePresence(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updatePresence(arg0, arg1);
+            return result;
+        }
+    }
+    async validateSession(arg0: string): Promise<string | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.validateSession(arg0);
+                return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.validateSession(arg0);
+            return from_candid_opt_n1(this._uploadFile, this._downloadFile, result);
+        }
+    }
+}
+function from_candid_GameChallengeView_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _GameChallengeView): GameChallengeView {
+    return from_candid_record_n7(_uploadFile, _downloadFile, value);
+}
+function from_candid_GameStatus_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _GameStatus): GameStatus {
+    return from_candid_variant_n9(_uploadFile, _downloadFile, value);
+}
+function from_candid_Message_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Message): Message {
+    return from_candid_record_n4(_uploadFile, _downloadFile, value);
+}
+function from_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [{
+        id: string;
+        status: string;
+        result: [] | [string];
+        move1: [] | [string];
+        move2: [] | [string];
+        player1: string;
+        player2: [] | [string];
+        roomId: string;
+    }]): {
+    id: string;
+    status: string;
+    result?: string;
+    move1?: string;
+    move2?: string;
+    player1: string;
+    player2?: string;
+    roomId: string;
+} | null {
+    return value.length === 0 ? null : from_candid_record_n11(_uploadFile, _downloadFile, value[0]);
+}
+function from_candid_record_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: string;
+    status: string;
+    result: [] | [string];
+    move1: [] | [string];
+    move2: [] | [string];
+    player1: string;
+    player2: [] | [string];
+    roomId: string;
+}): {
+    id: string;
+    status: string;
+    result?: string;
+    move1?: string;
+    move2?: string;
+    player1: string;
+    player2?: string;
+    roomId: string;
+} {
+    return {
+        id: value.id,
+        status: value.status,
+        result: record_opt_to_undefined(from_candid_opt_n1(_uploadFile, _downloadFile, value.result)),
+        move1: record_opt_to_undefined(from_candid_opt_n1(_uploadFile, _downloadFile, value.move1)),
+        move2: record_opt_to_undefined(from_candid_opt_n1(_uploadFile, _downloadFile, value.move2)),
+        player1: value.player1,
+        player2: record_opt_to_undefined(from_candid_opt_n1(_uploadFile, _downloadFile, value.player2)),
+        roomId: value.roomId
+    };
+}
+function from_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    username: string;
+    text: string;
+    voiceUrl: [] | [string];
+    timestamp: bigint;
+}): {
+    username: string;
+    text: string;
+    voiceUrl?: string;
+    timestamp: bigint;
+} {
+    return {
+        username: value.username,
+        text: value.text,
+        voiceUrl: record_opt_to_undefined(from_candid_opt_n1(_uploadFile, _downloadFile, value.voiceUrl)),
+        timestamp: value.timestamp
+    };
+}
+function from_candid_record_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: string;
+    status: _GameStatus;
+    timestamp: bigint;
+    gameName: string;
+    roomId: string;
+    challenger: string;
+}): {
+    id: string;
+    status: GameStatus;
+    timestamp: bigint;
+    gameName: string;
+    roomId: string;
+    challenger: string;
+} {
+    return {
+        id: value.id,
+        status: from_candid_GameStatus_n8(_uploadFile, _downloadFile, value.status),
+        timestamp: value.timestamp,
+        gameName: value.gameName,
+        roomId: value.roomId,
+        challenger: value.challenger
+    };
+}
+function from_candid_variant_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    pending: null;
+} | {
+    denied: null;
+} | {
+    accepted: null;
+}): GameStatus {
+    return "pending" in value ? GameStatus.pending : "denied" in value ? GameStatus.denied : "accepted" in value ? GameStatus.accepted : value;
+}
+function from_candid_vec_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Message>): Array<Message> {
+    return value.map((x)=>from_candid_Message_n3(_uploadFile, _downloadFile, x));
+}
+function from_candid_vec_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_GameChallengeView>): Array<GameChallengeView> {
+    return value.map((x)=>from_candid_GameChallengeView_n6(_uploadFile, _downloadFile, x));
+}
+function to_candid_opt_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
+    return value === null ? candid_none() : candid_some(value);
 }
 export interface CreateActorOptions {
     agent?: Agent;
