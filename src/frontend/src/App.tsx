@@ -229,6 +229,10 @@ function AppInner() {
               isStranger
               onRename={handleRename}
               onBack={() => setRoom({ type: "lobby" })}
+              onSkip={() => {
+                setMatchmaking(true);
+              }}
+              onGoToGameZone={() => setRoom({ type: "game" })}
               onStartDm={(r, f) =>
                 setRoom({ type: "dm", roomId: r, friendName: f })
               }

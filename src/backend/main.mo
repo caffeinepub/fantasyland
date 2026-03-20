@@ -258,6 +258,7 @@ actor {
         rooms.add(roomId, List.empty<Message>());
         matchQueue.remove(waitingUser);
         matchResults.add(waitingUser, roomId);
+        matchResults.add(username, roomId);
         return ?roomId;
       };
     };

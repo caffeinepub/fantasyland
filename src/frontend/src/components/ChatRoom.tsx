@@ -50,9 +50,9 @@ import {
   Mic,
   Paperclip,
   Pencil,
+  Send,
   Smile,
   Sparkles,
-  Sword,
   UserPlus,
   Users,
   X,
@@ -64,21 +64,16 @@ import { useTheme } from "../contexts/ThemeContext";
 import { playMessageSound } from "../hooks/useNotificationSound";
 import { usePresence } from "../hooks/usePresence";
 import {
-  useCreateGameChallenge,
   useFriendRequestStatus,
   useJoinRPSGame,
   useMessages,
   useOnlineUsers,
-  usePendingChallenges,
-  useRespondToChallenge,
   useSendFriendRequest,
   useSendMessage,
 } from "../hooks/useQueries";
 import CameraModal from "./CameraModal";
 import NumberGuess from "./NumberGuess";
 import QuickDMModal from "./QuickDMModal";
-import RPSGame from "./RPSGame";
-import ThemeToggle from "./ThemeToggle";
 import TicTacToe from "./TicTacToe";
 import UsernameTopBar from "./UsernameTopBar";
 
@@ -92,6 +87,8 @@ interface Props {
   onRename?: () => void;
   extraPanel?: React.ReactNode;
   onStartDm?: (roomId: string, friendName: string) => void;
+  onSkip?: () => void;
+  onGoToGameZone?: () => void;
 }
 
 function formatTime(ts: bigint): string {
@@ -285,6 +282,7 @@ export default function ChatRoom({
   isStranger = false,
   extraPanel,
   onStartDm,
+  onSkip,
 }: Props) {
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -325,6 +323,11 @@ export default function ChatRoom({
 
   // Voice recording (hold to record)
   const [isRecording, setIsRecording] = useState(false);
+  const [pendingVoice, setPendingVoice] = useState<{
+    blob: Blob;
+    url: string;
+    base64: string;
+  } | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingStreamRef = useRef<MediaStream | null>(null);
@@ -338,18 +341,13 @@ export default function ChatRoom({
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
-      mediaRecorder.onstop = async () => {
+      mediaRecorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const objectUrl = URL.createObjectURL(blob);
         const reader = new FileReader();
-        reader.onload = async () => {
-          const voiceUrl = reader.result as string;
-          if (!isAiBot) {
-            try {
-              await sendMutation.mutateAsync({ username, text: "", voiceUrl });
-            } catch {
-              // silent
-            }
-          }
+        reader.onload = () => {
+          const base64 = reader.result as string;
+          setPendingVoice({ blob, url: objectUrl, base64 });
         };
         reader.readAsDataURL(blob);
         for (const t of stream.getTracks()) t.stop();
@@ -366,6 +364,26 @@ export default function ChatRoom({
   const stopRecording = () => {
     mediaRecorderRef.current?.stop();
     setIsRecording(false);
+  };
+
+  const sendVoice = async () => {
+    if (!pendingVoice) return;
+    try {
+      await sendMutation.mutateAsync({
+        username,
+        text: "",
+        voiceUrl: pendingVoice.base64,
+      });
+    } catch {
+      // silent
+    }
+    URL.revokeObjectURL(pendingVoice.url);
+    setPendingVoice(null);
+  };
+
+  const cancelVoice = () => {
+    if (pendingVoice) URL.revokeObjectURL(pendingVoice.url);
+    setPendingVoice(null);
   };
 
   // Show "stranger connected" banner for 1v1 rooms
@@ -437,61 +455,6 @@ export default function ChatRoom({
     if (other) setStrangerName(other);
   }, [isStranger, onlineUsers, username]);
 
-  // Game challenges
-  const { data: pendingChallenges = [] } = usePendingChallenges(
-    isAiBot ? "__disabled__" : roomId,
-  );
-  const createChallengeMutation = useCreateGameChallenge();
-  const respondChallengeMutation = useRespondToChallenge();
-  const [showChallengeModal, setShowChallengeModal] = useState(false);
-  const [selectedGame, setSelectedGame] = useState<string | null>(null);
-
-  // Filter challenges not created by current user and only pending ones
-  const visibleChallenges = pendingChallenges.filter(
-    (c) => c.challenger !== username && c.status === "pending",
-  );
-
-  const handleAcceptChallenge = async (id: string, gameName: string) => {
-    try {
-      await respondChallengeMutation.mutateAsync({
-        challengeId: id,
-        username,
-        accept: true,
-      });
-      toast.success(`Challenge accepted! Starting ${gameName}...`);
-    } catch {
-      toast.error("Failed to accept challenge");
-    }
-  };
-
-  const handleDenyChallenge = async (id: string) => {
-    try {
-      await respondChallengeMutation.mutateAsync({
-        challengeId: id,
-        username,
-        accept: false,
-      });
-    } catch {
-      // silent
-    }
-  };
-
-  const handleSendChallenge = async (gameName: string) => {
-    setShowChallengeModal(false);
-    setSelectedGame(null);
-    try {
-      await createChallengeMutation.mutateAsync({
-        roomId,
-        challenger: username,
-        gameName,
-      });
-      await handleSendSystemMessage(
-        `🎮 ${username} has challenged the room to ${gameName}!`,
-      );
-    } catch {
-      toast.error("Failed to send challenge");
-    }
-  };
   // Sound notification for new messages
   useEffect(() => {
     if (messages.length > prevMsgCount.current) {
@@ -612,7 +575,7 @@ export default function ChatRoom({
     }
   };
 
-  const handleSendSystemMessage = async (msg: string) => {
+  const _handleSendSystemMessage = async (msg: string) => {
     try {
       await sendMutation.mutateAsync({ username, text: msg });
       qc.invalidateQueries({ queryKey: ["messages", roomId] });
@@ -632,15 +595,6 @@ export default function ChatRoom({
     setLocalEdits((prev) => ({ ...prev, [key]: editText }));
     setEditingId(null);
     setEditText("");
-  };
-
-  const _handleChallenge = async (type: "rps" | "ttt" | "ng") => {
-    const msgs = {
-      rps: `🎮 ${username} challenges the room to Rock Paper Scissors! Type /joingame [gameId] after they start a game to join!`,
-      ttt: `🎲 ${username} challenges you to Tic Tac Toe! First to reply /accept plays!`,
-      ng: `🔢 ${username} challenges the room to Number Guess! Join the game zone to play!`,
-    };
-    await handleSendSystemMessage(msgs[type]);
   };
 
   return (
@@ -737,12 +691,7 @@ export default function ChatRoom({
             >
               <MessageSquarePlus size={16} />
             </button>
-            <ThemeToggle ocidPrefix="chatroom" />
-            <RPSGame
-              roomId={roomId}
-              username={username}
-              onSendMessage={handleSendSystemMessage}
-            />
+
             <button
               type="button"
               data-ocid="chat.members.toggle"
@@ -765,6 +714,21 @@ export default function ChatRoom({
                 {onlineUsers.length > 0 ? onlineUsers.length : ""} online
               </span>
             </button>
+            {isStranger && onSkip && (
+              <button
+                type="button"
+                data-ocid="chat.skip.button"
+                onClick={onSkip}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
+                style={{
+                  background: "oklch(0.55 0.25 25 / 0.15)",
+                  border: "1px solid oklch(0.6 0.25 25 / 0.5)",
+                  color: "oklch(0.78 0.22 30)",
+                }}
+              >
+                ⏭ Skip
+              </button>
+            )}
             <div
               className="flex items-center gap-2 text-sm"
               style={{ color: "oklch(0.78 0.15 85)" }}
@@ -1060,78 +1024,6 @@ export default function ChatRoom({
             background: "oklch(0.1 0.03 275 / 0.9)",
           }}
         >
-          {/* Pending game challenges banner */}
-          {visibleChallenges.length > 0 && (
-            <div
-              className="mb-2 rounded-xl overflow-hidden"
-              style={{
-                background: "oklch(0.13 0.05 280)",
-                border: "1px solid oklch(0.65 0.22 50 / 0.4)",
-                boxShadow: "0 0 20px oklch(0.65 0.22 50 / 0.1)",
-              }}
-            >
-              {visibleChallenges.slice(0, 2).map((challenge, idx) => (
-                <div
-                  key={challenge.id}
-                  data-ocid={`chat.challenge.item.${idx + 1}`}
-                  className="flex items-center gap-3 px-3 py-2.5"
-                  style={{
-                    borderBottom:
-                      idx < visibleChallenges.slice(0, 2).length - 1
-                        ? "1px solid oklch(0.22 0.06 280 / 0.3)"
-                        : "none",
-                  }}
-                >
-                  <span className="text-lg">🎮</span>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="text-xs font-bold truncate"
-                      style={{ color: "oklch(0.85 0.06 280)" }}
-                    >
-                      <span style={{ color: "oklch(0.78 0.2 55)" }}>
-                        {challenge.challenger}
-                      </span>
-                      {" challenges: "}
-                      <span style={{ color: "oklch(0.85 0.15 305)" }}>
-                        {challenge.gameName}
-                      </span>
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    data-ocid={`chat.challenge.accept.${idx + 1}`}
-                    onClick={() =>
-                      handleAcceptChallenge(challenge.id, challenge.gameName)
-                    }
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
-                    style={{
-                      background: "oklch(0.45 0.2 145 / 0.2)",
-                      border: "1px solid oklch(0.5 0.2 145 / 0.5)",
-                      color: "oklch(0.78 0.22 145)",
-                    }}
-                  >
-                    <Check size={12} />
-                    Accept
-                  </button>
-                  <button
-                    type="button"
-                    data-ocid={`chat.challenge.cancel.${idx + 1}`}
-                    onClick={() => handleDenyChallenge(challenge.id)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
-                    style={{
-                      background: "oklch(0.45 0.2 20 / 0.2)",
-                      border: "1px solid oklch(0.5 0.2 20 / 0.5)",
-                      color: "oklch(0.75 0.2 25)",
-                    }}
-                  >
-                    <X size={12} />
-                    Deny
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Recording indicator */}
           {isRecording && (
             <div
@@ -1279,18 +1171,59 @@ export default function ChatRoom({
             </div>
 
             {/* Text input */}
-            <input
-              data-ocid="chat.input"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                isRecording ? "Recording… Release to send" : "Message"
-              }
-              disabled={isSending}
-              className="flex-1 bg-transparent border-none outline-none text-base min-w-0"
-              style={{ color: "oklch(0.88 0.03 280)" }}
-            />
+            {pendingVoice ? (
+              <div className="flex-1 flex items-center gap-2 min-w-0">
+                <audio
+                  controls
+                  src={pendingVoice.url}
+                  className="flex-1 h-8 min-w-0 rounded-lg"
+                  style={{ filter: "invert(0.8) hue-rotate(240deg)" }}
+                >
+                  <track kind="captions" />
+                </audio>
+                <button
+                  type="button"
+                  data-ocid="chat.voice.send_button"
+                  onClick={sendVoice}
+                  disabled={sendMutation.isPending}
+                  className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 active:scale-95 disabled:opacity-40"
+                  style={{
+                    background: "oklch(0.55 0.22 145)",
+                    color: "white",
+                    boxShadow: "0 0 12px oklch(0.55 0.22 145 / 0.6)",
+                  }}
+                  title="Send voice message"
+                >
+                  <Send size={16} />
+                </button>
+                <button
+                  type="button"
+                  data-ocid="chat.voice.cancel_button"
+                  onClick={cancelVoice}
+                  className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 active:scale-95"
+                  style={{
+                    background: "oklch(0.35 0.08 20)",
+                    color: "oklch(0.75 0.12 20)",
+                  }}
+                  title="Cancel voice message"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <input
+                data-ocid="chat.input"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  isRecording ? "Recording… Release to send" : "Message"
+                }
+                disabled={isSending}
+                className="flex-1 bg-transparent border-none outline-none text-base min-w-0"
+                style={{ color: "oklch(0.88 0.03 280)" }}
+              />
+            )}
 
             {/* Paperclip attachment */}
             <button
@@ -1318,18 +1251,6 @@ export default function ChatRoom({
               title="Camera"
             >
               <Camera size={18} strokeWidth={1.5} />
-            </button>
-
-            {/* Challenge button */}
-            <button
-              type="button"
-              data-ocid="chat.challenge.open_modal_button"
-              onClick={() => setShowChallengeModal(true)}
-              className="flex-shrink-0 p-1.5 rounded-full transition-all hover:scale-110"
-              style={{ color: "oklch(0.72 0.2 55)" }}
-              title="Challenge room to a game"
-            >
-              <Sword size={18} strokeWidth={1.5} />
             </button>
 
             {/* Microphone: hold to record voice message */}
@@ -1363,26 +1284,28 @@ export default function ChatRoom({
             </button>
 
             {/* Send button */}
-            <button
-              type="button"
-              data-ocid="chat.submit_button"
-              onClick={handleSend}
-              disabled={(!text.trim() && !mediaPreview) || isSending}
-              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-40"
-              style={{
-                background:
-                  text.trim() || mediaPreview
-                    ? "linear-gradient(135deg, oklch(0.55 0.28 305), oklch(0.5 0.25 270))"
-                    : "linear-gradient(135deg, oklch(0.45 0.22 305), oklch(0.4 0.2 270))",
-                boxShadow:
-                  text.trim() || mediaPreview
-                    ? "0 0 18px oklch(0.65 0.28 305 / 0.55)"
-                    : "none",
-                color: "oklch(0.97 0.02 280)",
-              }}
-            >
-              ➤
-            </button>
+            {!pendingVoice && (
+              <button
+                type="button"
+                data-ocid="chat.submit_button"
+                onClick={handleSend}
+                disabled={(!text.trim() && !mediaPreview) || isSending}
+                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-40"
+                style={{
+                  background:
+                    text.trim() || mediaPreview
+                      ? "linear-gradient(135deg, oklch(0.55 0.28 305), oklch(0.5 0.25 270))"
+                      : "linear-gradient(135deg, oklch(0.45 0.22 305), oklch(0.4 0.2 270))",
+                  boxShadow:
+                    text.trim() || mediaPreview
+                      ? "0 0 18px oklch(0.65 0.28 305 / 0.55)"
+                      : "none",
+                  color: "oklch(0.97 0.02 280)",
+                }}
+              >
+                ➤
+              </button>
+            )}
 
             <input
               ref={fileInputRef}
@@ -1402,129 +1325,6 @@ export default function ChatRoom({
         )}
         {activeGame === "ng" && (
           <NumberGuess onClose={() => setActiveGame(null)} />
-        )}
-      </AnimatePresence>
-
-      {/* Challenge Game Picker Modal */}
-      <AnimatePresence>
-        {showChallengeModal && (
-          <motion.div
-            data-ocid="chat.challenge.dialog"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
-            style={{ background: "oklch(0 0 0 / 0.6)" }}
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setShowChallengeModal(false);
-            }}
-          >
-            <motion.div
-              initial={{ y: 40, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 40, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 380, damping: 30 }}
-              className="w-full max-w-sm rounded-2xl p-5"
-              style={{
-                background: "oklch(0.13 0.05 280)",
-                border: "1px solid oklch(0.28 0.08 280 / 0.7)",
-                boxShadow:
-                  "0 8px 40px oklch(0 0 0 / 0.6), 0 0 40px oklch(0.65 0.22 50 / 0.1)",
-              }}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3
-                  className="font-black text-base"
-                  style={{ color: "oklch(0.92 0.04 280)" }}
-                >
-                  🎮 Challenge Room
-                </h3>
-                <button
-                  type="button"
-                  data-ocid="chat.challenge.close_button"
-                  onClick={() => setShowChallengeModal(false)}
-                  className="w-7 h-7 rounded-full flex items-center justify-center"
-                  style={{
-                    background: "oklch(0.18 0.04 280)",
-                    color: "oklch(0.55 0.06 280)",
-                  }}
-                >
-                  <X size={14} />
-                </button>
-              </div>
-              <p
-                className="text-xs mb-4"
-                style={{ color: "oklch(0.55 0.06 280)" }}
-              >
-                Pick a game — a challenge will be sent to everyone in the room
-              </p>
-              <div className="flex flex-col gap-2 mb-4">
-                {[
-                  { name: "Rock Paper Scissors", emoji: "✊" },
-                  { name: "Tic Tac Toe", emoji: "⬜" },
-                  { name: "Number Guess", emoji: "🔢" },
-                  { name: "Word Scramble", emoji: "🔤" },
-                  { name: "Trivia Quiz", emoji: "🧠" },
-                ].map((game) => (
-                  <button
-                    key={game.name}
-                    type="button"
-                    data-ocid={`chat.challenge.${game.name.toLowerCase().replace(/ /g, "_")}.button`}
-                    onClick={() =>
-                      setSelectedGame(
-                        selectedGame === game.name ? null : game.name,
-                      )
-                    }
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all hover:scale-[1.01]"
-                    style={{
-                      background:
-                        selectedGame === game.name
-                          ? "oklch(0.65 0.22 50 / 0.2)"
-                          : "oklch(0.17 0.05 280)",
-                      border:
-                        selectedGame === game.name
-                          ? "2px solid oklch(0.65 0.22 50 / 0.6)"
-                          : "1px solid oklch(0.25 0.07 280 / 0.5)",
-                      color:
-                        selectedGame === game.name
-                          ? "oklch(0.85 0.2 55)"
-                          : "oklch(0.82 0.05 280)",
-                    }}
-                  >
-                    <span className="text-xl">{game.emoji}</span>
-                    {game.name}
-                    {selectedGame === game.name && (
-                      <Check
-                        size={16}
-                        className="ml-auto"
-                        style={{ color: "oklch(0.75 0.22 145)" }}
-                      />
-                    )}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                data-ocid="chat.challenge.confirm_button"
-                disabled={!selectedGame}
-                onClick={() =>
-                  selectedGame && handleSendChallenge(selectedGame)
-                }
-                className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:scale-105 disabled:opacity-40"
-                style={{
-                  background: selectedGame
-                    ? "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))"
-                    : "oklch(0.2 0.04 280)",
-                  color: "white",
-                  boxShadow: selectedGame
-                    ? "0 0 20px oklch(0.65 0.22 50 / 0.4)"
-                    : "none",
-                }}
-              >
-                Send Challenge 🎯
-              </button>
-            </motion.div>
-          </motion.div>
         )}
       </AnimatePresence>
 
