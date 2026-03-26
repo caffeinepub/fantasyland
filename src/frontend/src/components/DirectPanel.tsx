@@ -15,29 +15,13 @@ import {
   usePendingFriendRequests,
   useRespondToFriendRequest,
 } from "../hooks/useQueries";
+import AnimatedAvatar from "./AnimatedAvatar";
 import UsernameTopBar from "./UsernameTopBar";
 
 interface Props {
   username: string;
   onBack: () => void;
   onOpenDm: (roomId: string, friendName: string) => void;
-}
-
-function getUserColor(name: string): string {
-  const colors = [
-    "oklch(0.65 0.28 305)",
-    "oklch(0.72 0.2 200)",
-    "oklch(0.78 0.15 85)",
-    "oklch(0.6 0.25 250)",
-    "oklch(0.65 0.22 50)",
-    "oklch(0.75 0.22 320)",
-    "oklch(0.7 0.28 330)",
-    "oklch(0.7 0.2 180)",
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++)
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return colors[Math.abs(hash) % colors.length];
 }
 
 export default function DirectPanel({ username, onBack, onOpenDm }: Props) {
@@ -295,7 +279,6 @@ export default function DirectPanel({ username, onBack, onOpenDm }: Props) {
             ) : (
               <div className="space-y-2">
                 {incomingRequests.map((req, idx) => {
-                  const color = getUserColor(req.from);
                   return (
                     <div
                       key={req.from}
@@ -306,16 +289,7 @@ export default function DirectPanel({ username, onBack, onOpenDm }: Props) {
                         border: "1px solid oklch(0.22 0.06 280 / 0.4)",
                       }}
                     >
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                        style={{
-                          background: `${color}25`,
-                          border: `1.5px solid ${color}60`,
-                          color,
-                        }}
-                      >
-                        {req.from.charAt(0).toUpperCase()}
-                      </div>
+                      <AnimatedAvatar username={req.from} size="md" />
                       <div className="flex-1 min-w-0">
                         <p
                           className="font-semibold text-sm"
@@ -426,7 +400,6 @@ export default function DirectPanel({ username, onBack, onOpenDm }: Props) {
             ) : (
               <div className="space-y-2">
                 {friends.map((friendName, idx) => {
-                  const color = getUserColor(friendName);
                   return (
                     <div
                       key={friendName}
@@ -437,16 +410,7 @@ export default function DirectPanel({ username, onBack, onOpenDm }: Props) {
                         border: "1px solid oklch(0.22 0.06 280 / 0.4)",
                       }}
                     >
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                        style={{
-                          background: `${color}25`,
-                          border: `1.5px solid ${color}60`,
-                          color,
-                        }}
-                      >
-                        {friendName.charAt(0).toUpperCase()}
-                      </div>
+                      <AnimatedAvatar username={friendName} size="md" />
                       <div className="flex-1 min-w-0">
                         <p
                           className="font-semibold text-sm"

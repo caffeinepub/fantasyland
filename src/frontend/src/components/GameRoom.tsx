@@ -13,6 +13,9 @@ import {
   usePendingChallenges,
   useRespondToChallenge,
 } from "../hooks/useQueries";
+import { getLeaderboard, saveScore } from "../lib/gameScores";
+import AnimatedAvatar from "./AnimatedAvatar";
+import NewRecordPopup from "./NewRecordPopup";
 import NumberGuess from "./NumberGuess";
 import RPSGame from "./RPSGame";
 import TicTacToe from "./TicTacToe";
@@ -70,7 +73,10 @@ function scramble(word: string): string {
   return arr.join("");
 }
 
-function WordScramble() {
+function WordScramble({
+  username = "Guest",
+  uid = "",
+}: { username?: string; uid?: string }) {
   const [wordIndex, setWordIndex] = useState(() =>
     Math.floor(Math.random() * WORDS.length),
   );
@@ -81,6 +87,7 @@ function WordScramble() {
   const [timeLeft, setTimeLeft] = useState(60);
   const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
   const [gameOver, setGameOver] = useState(false);
+  const [wsNewRecord, setWsNewRecord] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const currentWord = WORDS[wordIndex];
@@ -124,175 +131,207 @@ function WordScramble() {
     setInput("");
   }
 
+  // Save score on game over
+  const wsScoreRef = useRef(score);
+  wsScoreRef.current = score;
+  const wsUsernameRef = useRef(username);
+  wsUsernameRef.current = username;
+  const wsUidRef = useRef(uid);
+  wsUidRef.current = uid;
+  useEffect(() => {
+    if (gameOver && wsScoreRef.current > 0) {
+      const isNew = saveScore(
+        wsUidRef.current || wsUsernameRef.current,
+        wsUsernameRef.current,
+        "Word Scramble",
+        wsScoreRef.current,
+      );
+      if (isNew) setWsNewRecord(true);
+    }
+  }, [gameOver]);
+
   function restart() {
     setScore(0);
     setStreak(0);
     setTimeLeft(60);
     setGameOver(false);
+    setWsNewRecord(false);
     setFeedback(null);
     nextWord();
   }
 
   return (
-    <div
-      className="w-full rounded-2xl p-6"
-      style={{
-        background: "oklch(0.12 0.035 275)",
-        border: "1px solid oklch(0.22 0.06 280 / 0.5)",
-      }}
-    >
-      {gameOver ? (
-        <div className="text-center py-8">
-          <div className="text-6xl mb-4">🏆</div>
-          <h2
-            className="text-3xl font-black mb-2"
-            style={{ color: "oklch(0.85 0.22 55)" }}
-          >
-            Time's Up!
-          </h2>
-          <p style={{ color: "oklch(0.7 0.06 280)" }}>
-            Final Score: <span className="font-bold text-white">{score}</span>
-          </p>
-          <button
-            type="button"
-            onClick={restart}
-            className="mt-6 px-8 py-3 rounded-xl font-bold transition-all hover:scale-105"
-            style={{
-              background:
-                "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
-              color: "white",
-              boxShadow: "0 0 20px oklch(0.65 0.22 50 / 0.4)",
-            }}
-          >
-            Play Again
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex gap-4">
-              <div
-                className="px-3 py-1.5 rounded-lg text-sm font-bold"
-                style={{
-                  background: "oklch(0.65 0.22 50 / 0.15)",
-                  color: "oklch(0.78 0.2 55)",
-                  border: "1px solid oklch(0.65 0.22 50 / 0.3)",
-                }}
-              >
-                🏆 {score} pts
-              </div>
-              {streak >= 2 && (
-                <div
-                  className="px-3 py-1.5 rounded-lg text-sm font-bold"
-                  style={{
-                    background: "oklch(0.6 0.25 30 / 0.15)",
-                    color: "oklch(0.78 0.25 35)",
-                    border: "1px solid oklch(0.6 0.25 30 / 0.3)",
-                  }}
-                >
-                  🔥 x{streak}
-                </div>
-              )}
-            </div>
-            <div
-              className="px-3 py-1.5 rounded-lg text-sm font-bold"
-              style={{
-                background:
-                  timeLeft <= 10
-                    ? "oklch(0.5 0.2 20 / 0.3)"
-                    : "oklch(0.22 0.06 280 / 0.5)",
-                color:
-                  timeLeft <= 10 ? "oklch(0.75 0.2 25)" : "oklch(0.7 0.06 280)",
-                border: `1px solid ${timeLeft <= 10 ? "oklch(0.5 0.2 20 / 0.4)" : "oklch(0.3 0.06 280 / 0.4)"}`,
-              }}
+    <>
+      <NewRecordPopup
+        show={wsNewRecord}
+        score={score}
+        gameName="Word Scramble"
+        onDismiss={() => setWsNewRecord(false)}
+      />
+      <div
+        className="w-full rounded-2xl p-6"
+        style={{
+          background: "oklch(0.12 0.035 275)",
+          border: "1px solid oklch(0.22 0.06 280 / 0.5)",
+        }}
+      >
+        {gameOver ? (
+          <div className="text-center py-8">
+            <div className="text-6xl mb-4">🏆</div>
+            <h2
+              className="text-3xl font-black mb-2"
+              style={{ color: "oklch(0.85 0.22 55)" }}
             >
-              ⏱ {timeLeft}s
-            </div>
-          </div>
-
-          <div className="text-center mb-8">
-            <p
-              className="text-xs uppercase tracking-widest mb-3"
-              style={{ color: "oklch(0.55 0.06 280)" }}
-            >
-              Unscramble this word
+              Time's Up!
+            </h2>
+            <p style={{ color: "oklch(0.7 0.06 280)" }}>
+              Final Score: <span className="font-bold text-white">{score}</span>
             </p>
-            <div
-              className="text-5xl font-black tracking-widest py-6 rounded-2xl"
-              style={{
-                background: "oklch(0.09 0.03 280)",
-                color: "oklch(0.92 0.04 280)",
-                letterSpacing: "0.4em",
-              }}
-            >
-              {scrambled}
-            </div>
-          </div>
-
-          {feedback && (
-            <div
-              className="text-center text-sm font-bold mb-4 py-2 rounded-lg"
-              style={{
-                background:
-                  feedback === "correct"
-                    ? "oklch(0.5 0.2 145 / 0.2)"
-                    : "oklch(0.5 0.2 20 / 0.2)",
-                color:
-                  feedback === "correct"
-                    ? "oklch(0.75 0.2 150)"
-                    : "oklch(0.75 0.2 25)",
-              }}
-            >
-              {feedback === "correct" ? "✅ Correct! +10 pts" : "❌ Try again!"}
-            </div>
-          )}
-
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleGuess()}
-              placeholder="Type your answer..."
-              className="flex-1 px-4 py-3 rounded-xl outline-none text-white font-bold uppercase"
-              style={{
-                background: "oklch(0.09 0.03 280)",
-                border: "2px solid oklch(0.22 0.06 280 / 0.5)",
-              }}
-              data-ocid="wordscramble.input"
-            />
             <button
               type="button"
-              onClick={handleGuess}
-              className="px-6 py-3 rounded-xl font-bold transition-all hover:scale-105"
+              onClick={restart}
+              className="mt-6 px-8 py-3 rounded-xl font-bold transition-all hover:scale-105"
               style={{
                 background:
                   "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
                 color: "white",
-                boxShadow: "0 0 16px oklch(0.65 0.22 50 / 0.4)",
+                boxShadow: "0 0 20px oklch(0.65 0.22 50 / 0.4)",
               }}
-              data-ocid="wordscramble.submit_button"
             >
-              Guess
+              Play Again
             </button>
           </div>
+        ) : (
+          <>
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex gap-4">
+                <div
+                  className="px-3 py-1.5 rounded-lg text-sm font-bold"
+                  style={{
+                    background: "oklch(0.65 0.22 50 / 0.15)",
+                    color: "oklch(0.78 0.2 55)",
+                    border: "1px solid oklch(0.65 0.22 50 / 0.3)",
+                  }}
+                >
+                  🏆 {score} pts
+                </div>
+                {streak >= 2 && (
+                  <div
+                    className="px-3 py-1.5 rounded-lg text-sm font-bold"
+                    style={{
+                      background: "oklch(0.6 0.25 30 / 0.15)",
+                      color: "oklch(0.78 0.25 35)",
+                      border: "1px solid oklch(0.6 0.25 30 / 0.3)",
+                    }}
+                  >
+                    🔥 x{streak}
+                  </div>
+                )}
+              </div>
+              <div
+                className="px-3 py-1.5 rounded-lg text-sm font-bold"
+                style={{
+                  background:
+                    timeLeft <= 10
+                      ? "oklch(0.5 0.2 20 / 0.3)"
+                      : "oklch(0.22 0.06 280 / 0.5)",
+                  color:
+                    timeLeft <= 10
+                      ? "oklch(0.75 0.2 25)"
+                      : "oklch(0.7 0.06 280)",
+                  border: `1px solid ${timeLeft <= 10 ? "oklch(0.5 0.2 20 / 0.4)" : "oklch(0.3 0.06 280 / 0.4)"}`,
+                }}
+              >
+                ⏱ {timeLeft}s
+              </div>
+            </div>
 
-          <button
-            type="button"
-            onClick={nextWord}
-            className="mt-3 w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105"
-            style={{
-              background: "oklch(0.22 0.06 280 / 0.3)",
-              color: "oklch(0.6 0.06 280)",
-              border: "1px solid oklch(0.22 0.06 280 / 0.4)",
-            }}
-            data-ocid="wordscramble.secondary_button"
-          >
-            Skip → Next Word
-          </button>
-        </>
-      )}
-    </div>
+            <div className="text-center mb-8">
+              <p
+                className="text-xs uppercase tracking-widest mb-3"
+                style={{ color: "oklch(0.55 0.06 280)" }}
+              >
+                Unscramble this word
+              </p>
+              <div
+                className="text-5xl font-black tracking-widest py-6 rounded-2xl"
+                style={{
+                  background: "oklch(0.09 0.03 280)",
+                  color: "oklch(0.92 0.04 280)",
+                  letterSpacing: "0.4em",
+                }}
+              >
+                {scrambled}
+              </div>
+            </div>
+
+            {feedback && (
+              <div
+                className="text-center text-sm font-bold mb-4 py-2 rounded-lg"
+                style={{
+                  background:
+                    feedback === "correct"
+                      ? "oklch(0.5 0.2 145 / 0.2)"
+                      : "oklch(0.5 0.2 20 / 0.2)",
+                  color:
+                    feedback === "correct"
+                      ? "oklch(0.75 0.2 150)"
+                      : "oklch(0.75 0.2 25)",
+                }}
+              >
+                {feedback === "correct"
+                  ? "✅ Correct! +10 pts"
+                  : "❌ Try again!"}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleGuess()}
+                placeholder="Type your answer..."
+                className="flex-1 px-4 py-3 rounded-xl outline-none text-white font-bold uppercase"
+                style={{
+                  background: "oklch(0.09 0.03 280)",
+                  border: "2px solid oklch(0.22 0.06 280 / 0.5)",
+                }}
+                data-ocid="wordscramble.input"
+              />
+              <button
+                type="button"
+                onClick={handleGuess}
+                className="px-6 py-3 rounded-xl font-bold transition-all hover:scale-105"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
+                  color: "white",
+                  boxShadow: "0 0 16px oklch(0.65 0.22 50 / 0.4)",
+                }}
+                data-ocid="wordscramble.submit_button"
+              >
+                Guess
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={nextWord}
+              className="mt-3 w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105"
+              style={{
+                background: "oklch(0.22 0.06 280 / 0.3)",
+                color: "oklch(0.6 0.06 280)",
+                border: "1px solid oklch(0.22 0.06 280 / 0.4)",
+              }}
+              data-ocid="wordscramble.secondary_button"
+            >
+              Skip → Next Word
+            </button>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -350,13 +389,17 @@ const TRIVIA_QUESTIONS = [
   },
 ];
 
-function TriviaQuiz() {
+function TriviaQuiz({
+  username = "Guest",
+  uid = "",
+}: { username?: string; uid?: string }) {
   const [current, setCurrent] = useState(0);
   const [questionKey, setQuestionKey] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(30);
   const [finished, setFinished] = useState(false);
+  const [triviaNewRecord, setTriviaNewRecord] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentRef = useRef(0);
 
@@ -415,47 +458,74 @@ function TriviaQuiz() {
   const q = TRIVIA_QUESTIONS[current];
   const progress = (current / TRIVIA_QUESTIONS.length) * 100;
 
+  // Save score on finish
+  const trivScoreRef = useRef(score);
+  trivScoreRef.current = score;
+  const trivUsernameRef = useRef(username);
+  trivUsernameRef.current = username;
+  const trivUidRef = useRef(uid);
+  trivUidRef.current = uid;
+  useEffect(() => {
+    if (finished && trivScoreRef.current > 0) {
+      const isNew = saveScore(
+        trivUidRef.current || trivUsernameRef.current,
+        trivUsernameRef.current,
+        "Trivia Quiz",
+        trivScoreRef.current,
+      );
+      if (isNew) setTriviaNewRecord(true);
+    }
+  }, [finished]);
+
   if (finished) {
     const emoji = score >= 8 ? "🏆" : score >= 5 ? "🎯" : "💪";
     return (
-      <div
-        className="w-full rounded-2xl p-8 text-center"
-        style={{
-          background: "oklch(0.12 0.035 275)",
-          border: "1px solid oklch(0.22 0.06 280 / 0.5)",
-        }}
-      >
-        <div className="text-6xl mb-4">{emoji}</div>
-        <h2
-          className="text-3xl font-black mb-2"
-          style={{ color: "oklch(0.85 0.22 55)" }}
-        >
-          Quiz Complete!
-        </h2>
-        <p className="text-lg mb-1" style={{ color: "oklch(0.7 0.06 280)" }}>
-          You scored
-        </p>
-        <p
-          className="text-5xl font-black mb-6"
-          style={{ color: "oklch(0.88 0.22 80)" }}
-        >
-          {score} / {TRIVIA_QUESTIONS.length}
-        </p>
-        <button
-          type="button"
-          onClick={restart}
-          className="px-8 py-3 rounded-xl font-bold transition-all hover:scale-105"
+      <>
+        <NewRecordPopup
+          show={triviaNewRecord}
+          score={score}
+          gameName="Trivia Quiz"
+          onDismiss={() => setTriviaNewRecord(false)}
+        />
+        <div
+          className="w-full rounded-2xl p-8 text-center"
           style={{
-            background:
-              "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
-            color: "white",
-            boxShadow: "0 0 20px oklch(0.65 0.22 50 / 0.4)",
+            background: "oklch(0.12 0.035 275)",
+            border: "1px solid oklch(0.22 0.06 280 / 0.5)",
           }}
-          data-ocid="trivia.primary_button"
         >
-          Play Again
-        </button>
-      </div>
+          <div className="text-6xl mb-4">{emoji}</div>
+          <h2
+            className="text-3xl font-black mb-2"
+            style={{ color: "oklch(0.85 0.22 55)" }}
+          >
+            Quiz Complete!
+          </h2>
+          <p className="text-lg mb-1" style={{ color: "oklch(0.7 0.06 280)" }}>
+            You scored
+          </p>
+          <p
+            className="text-5xl font-black mb-6"
+            style={{ color: "oklch(0.88 0.22 80)" }}
+          >
+            {score} / {TRIVIA_QUESTIONS.length}
+          </p>
+          <button
+            type="button"
+            onClick={restart}
+            className="px-8 py-3 rounded-xl font-bold transition-all hover:scale-105"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
+              color: "white",
+              boxShadow: "0 0 20px oklch(0.65 0.22 50 / 0.4)",
+            }}
+            data-ocid="trivia.primary_button"
+          >
+            Play Again
+          </button>
+        </div>
+      </>
     );
   }
 
@@ -1006,8 +1076,130 @@ function DuelGame() {
 }
 
 // ─── GameRoom shell ───────────────────────────────────────────────────────────
+
+// ─── Leaderboard Panel ───────────────────────────────────────────────────────
+const RANK_STYLES = [
+  {
+    label: "🥇",
+    bg: "linear-gradient(135deg, oklch(0.82 0.2 80 / 0.15), oklch(0.75 0.22 65 / 0.1))",
+    border: "oklch(0.82 0.2 80 / 0.5)",
+  },
+  {
+    label: "🥈",
+    bg: "linear-gradient(135deg, oklch(0.72 0.08 270 / 0.15), oklch(0.65 0.1 260 / 0.1))",
+    border: "oklch(0.72 0.08 270 / 0.4)",
+  },
+  {
+    label: "🥉",
+    bg: "linear-gradient(135deg, oklch(0.68 0.16 45 / 0.15), oklch(0.6 0.18 35 / 0.1))",
+    border: "oklch(0.68 0.16 45 / 0.4)",
+  },
+];
+
+function LeaderboardPanel({
+  username,
+  uid,
+}: { username: string; uid: string }) {
+  const scores = getLeaderboard();
+  const currentKey = uid || username;
+
+  // Ensure current user appears
+  if (scores.length === 0) {
+    return (
+      <div
+        className="p-8 text-center"
+        data-ocid="gamezone.leaderboard.empty_state"
+      >
+        <div className="text-5xl mb-4">🎮</div>
+        <p className="font-bold mb-1" style={{ color: "oklch(0.85 0.06 280)" }}>
+          No scores yet!
+        </p>
+        <p className="text-sm" style={{ color: "oklch(0.5 0.06 280)" }}>
+          Play a game to get on the board
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-2" data-ocid="gamezone.leaderboard.list">
+      {scores.map((player, i) => {
+        const rankStyle = RANK_STYLES[i] ?? {
+          label: `#${i + 1}`,
+          bg: "oklch(0.13 0.04 280 / 0.5)",
+          border: "oklch(0.22 0.06 280 / 0.3)",
+        };
+        const isMe = player.uid === currentKey || player.username === username;
+        const totalScore = Object.values(player.scores).reduce(
+          (s, v) => s + v,
+          0,
+        );
+        return (
+          <div
+            key={player.uid}
+            data-ocid={`gamezone.leaderboard.item.${i + 1}`}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl"
+            style={{
+              background: isMe ? "oklch(0.65 0.28 305 / 0.12)" : rankStyle.bg,
+              border: `1px solid ${isMe ? "oklch(0.65 0.28 305 / 0.4)" : rankStyle.border}`,
+            }}
+          >
+            <span className="text-xl w-8 text-center flex-shrink-0">
+              {rankStyle.label}
+            </span>
+            <AnimatedAvatar username={player.username} size="sm" />
+            <div className="flex-1 min-w-0">
+              <p
+                className="text-sm font-bold truncate"
+                style={{
+                  color: isMe ? "oklch(0.85 0.2 305)" : "oklch(0.88 0.05 280)",
+                }}
+              >
+                {player.username} {isMe ? "(you)" : ""}
+              </p>
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {Object.entries(player.scores).map(([game, s]) => (
+                  <span
+                    key={game}
+                    className="text-xs px-1.5 py-0.5 rounded-md"
+                    style={{
+                      background: "oklch(0.18 0.05 280)",
+                      color: "oklch(0.65 0.1 280)",
+                    }}
+                  >
+                    {game.split(" ")[0]}: {s}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p
+                className="text-lg font-black"
+                style={{ color: "oklch(0.82 0.2 80)" }}
+              >
+                {totalScore}
+              </p>
+              <p className="text-xs" style={{ color: "oklch(0.5 0.06 280)" }}>
+                {player.totalWins}W
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function GameRoom({ username, onRename, onBack }: Props) {
   const [activeTab, setActiveTab] = useState<GameTab>("rps");
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const uid = (() => {
+    try {
+      return localStorage.getItem("fantasyUID") || username;
+    } catch {
+      return username;
+    }
+  })();
 
   const { data: pendingChallenges = [] } = usePendingChallenges("game");
   const respondChallengeMutation = useRespondToChallenge();
@@ -1107,13 +1299,22 @@ export default function GameRoom({ username, onRename, onBack }: Props) {
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <Trophy size={14} style={{ color: "oklch(0.78 0.2 55)" }} />
-          <span
-            className="text-xs font-bold"
-            style={{ color: "oklch(0.65 0.2 55)" }}
+          <button
+            type="button"
+            data-ocid="gamezone.leaderboard.open_modal_button"
+            onClick={() => setShowLeaderboard(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs transition-all hover:scale-105"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.65 0.22 50 / 0.15), oklch(0.6 0.25 80 / 0.15))",
+              border: "1px solid oklch(0.65 0.22 50 / 0.5)",
+              color: "oklch(0.78 0.2 55)",
+              boxShadow: "0 0 12px oklch(0.65 0.22 50 / 0.2)",
+            }}
           >
-            GAME ZONE
-          </span>
+            <Trophy size={14} />
+            <span className="hidden sm:inline">Leaderboard</span>
+          </button>
         </div>
       </header>
 
@@ -1242,11 +1443,71 @@ export default function GameRoom({ username, onRename, onBack }: Props) {
           )}
           {activeTab === "ttt" && <TicTacToe onClose={() => {}} inline />}
           {activeTab === "ng" && <NumberGuess onClose={() => {}} inline />}
-          {activeTab === "ws" && <WordScramble />}
-          {activeTab === "trivia" && <TriviaQuiz />}
+          {activeTab === "ws" && <WordScramble username={username} uid={uid} />}
+          {activeTab === "trivia" && (
+            <TriviaQuiz username={username} uid={uid} />
+          )}
           {activeTab === "duel" && <DuelGame />}
         </div>
       </div>
+      {/* Leaderboard Modal */}
+      {showLeaderboard && (
+        <div
+          className="fixed inset-0 flex items-center justify-center p-4 cursor-default"
+          style={{ zIndex: 9997, background: "oklch(0 0 0 / 0.7)" }}
+          data-ocid="gamezone.leaderboard.modal"
+        >
+          <div
+            className="w-full max-w-md rounded-3xl overflow-hidden"
+            style={{
+              background:
+                "linear-gradient(160deg, oklch(0.14 0.07 285), oklch(0.1 0.04 265))",
+              border: "1px solid oklch(0.65 0.22 50 / 0.4)",
+              boxShadow: "0 0 60px oklch(0.65 0.22 50 / 0.2)",
+              maxHeight: "80vh",
+            }}
+          >
+            <div
+              className="flex items-center gap-3 px-6 py-5 border-b"
+              style={{ borderColor: "oklch(0.22 0.06 280 / 0.4)" }}
+            >
+              <span className="text-3xl">🏆</span>
+              <div>
+                <h2
+                  className="text-xl font-black"
+                  style={{ color: "oklch(0.92 0.04 280)" }}
+                >
+                  Leaderboard
+                </h2>
+                <p
+                  className="text-xs"
+                  style={{ color: "oklch(0.55 0.06 280)" }}
+                >
+                  Top players across all games
+                </p>
+              </div>
+              <button
+                type="button"
+                data-ocid="gamezone.leaderboard.close_button"
+                onClick={() => setShowLeaderboard(false)}
+                className="ml-auto p-2 rounded-lg transition-all hover:scale-105"
+                style={{
+                  background: "oklch(0.18 0.04 280)",
+                  color: "oklch(0.6 0.06 280)",
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div
+              className="overflow-y-auto"
+              style={{ maxHeight: "calc(80vh - 80px)" }}
+            >
+              <LeaderboardPanel username={username} uid={uid} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

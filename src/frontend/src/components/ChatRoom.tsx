@@ -71,6 +71,7 @@ import {
   useSendFriendRequest,
   useSendMessage,
 } from "../hooks/useQueries";
+import AnimatedAvatar from "./AnimatedAvatar";
 import CameraModal from "./CameraModal";
 import NumberGuess from "./NumberGuess";
 import QuickDMModal from "./QuickDMModal";
@@ -800,18 +801,13 @@ export default function ChatRoom({
               >
                 <button
                   type="button"
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 cursor-pointer"
-                  style={{
-                    background: `${color}30`,
-                    border: `1px solid ${color}60`,
-                    color,
-                  }}
+                  className="flex-shrink-0 cursor-pointer"
                   onClick={() => {
                     if (!isOwn) setSelectedUser(msg.username);
                   }}
                   tabIndex={isOwn ? -1 : 0}
                 >
-                  {msg.username.charAt(0).toUpperCase()}
+                  <AnimatedAvatar username={msg.username} size="sm" />
                 </button>
                 <div
                   className={`max-w-xs sm:max-w-md ${
@@ -966,23 +962,13 @@ export default function ChatRoom({
           )}
           {/* Optimistic messages */}
           {optimisticMessages.map((msg) => {
-            const color = getUserColor(msg.username);
             return (
               <div
                 key={msg.key}
                 className="flex items-start gap-3 flex-row-reverse"
                 style={{ opacity: 0.7 }}
               >
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                  style={{
-                    background: `${color}30`,
-                    border: `1px solid ${color}60`,
-                    color,
-                  }}
-                >
-                  {msg.username.charAt(0).toUpperCase()}
-                </div>
+                <AnimatedAvatar username={msg.username} size="sm" />
                 <div className="items-end flex flex-col gap-1 max-w-xs sm:max-w-md">
                   <span
                     className="text-xs font-medium"
@@ -1402,7 +1388,6 @@ export default function ChatRoom({
               <ScrollArea className="flex-1">
                 <div className="p-3 space-y-1">
                   {onlineUsers.map((user, i) => {
-                    const color = getUserColor(user);
                     const isMe = user === username;
                     return (
                       <motion.div
@@ -1421,15 +1406,8 @@ export default function ChatRoom({
                             : "1px solid transparent",
                         }}
                       >
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 relative"
-                          style={{
-                            background: `${color}25`,
-                            border: `1px solid ${color}60`,
-                            color,
-                          }}
-                        >
-                          {user.charAt(0).toUpperCase()}
+                        <div className="relative flex-shrink-0">
+                          <AnimatedAvatar username={user} size="sm" />
                           <span
                             className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2"
                             style={{

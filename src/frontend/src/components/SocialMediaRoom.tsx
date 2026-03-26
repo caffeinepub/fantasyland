@@ -14,7 +14,9 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import AnimatedAvatar from "./AnimatedAvatar";
 import CameraModal from "./CameraModal";
+import TrendingPopup from "./TrendingPopup";
 import UsernameTopBar from "./UsernameTopBar";
 
 interface Comment {
@@ -177,6 +179,20 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
     "home" | "reels" | "direct" | "search" | "profile"
   >("home");
   const [showCameraModal, setShowCameraModal] = useState(false);
+  const [trendingPopup, setTrendingPopup] = useState<{
+    show: boolean;
+    variant: "trending" | "viral";
+    postSnippet: string;
+    authorName: string;
+    likes: number;
+  }>({
+    show: false,
+    variant: "trending",
+    postSnippet: "",
+    authorName: "",
+    likes: 0,
+  });
+  const shownTrending = useRef<Set<string>>(new Set());
 
   // Stories state
   const [stories, setStories] = useState<Story[]>(SAMPLE_STORIES);
@@ -278,8 +294,8 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
   };
 
   const handleLike = (id: number) => {
-    setPosts((prev) =>
-      prev.map((p) =>
+    setPosts((prev) => {
+      const updated = prev.map((p) =>
         p.id === id
           ? {
               ...p,
@@ -287,8 +303,43 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
               likes: p.liked ? p.likes - 1 : p.likes + 1,
             }
           : p,
-      ),
-    );
+      );
+      const post = updated.find((p) => p.id === id);
+      if (post && !post.liked === false) {
+        const key = `post-${id}`;
+        if (post.likes >= 20 && !shownTrending.current.has(`viral-${key}`)) {
+          shownTrending.current.add(`viral-${key}`);
+          setTimeout(
+            () =>
+              setTrendingPopup({
+                show: true,
+                variant: "viral",
+                postSnippet: post.text,
+                authorName: post.username,
+                likes: post.likes,
+              }),
+            50,
+          );
+        } else if (
+          post.likes >= 10 &&
+          !shownTrending.current.has(`trending-${key}`)
+        ) {
+          shownTrending.current.add(`trending-${key}`);
+          setTimeout(
+            () =>
+              setTrendingPopup({
+                show: true,
+                variant: "trending",
+                postSnippet: post.text,
+                authorName: post.username,
+                likes: post.likes,
+              }),
+            50,
+          );
+        }
+      }
+      return updated;
+    });
   };
 
   const handleToggleComments = (postId: number) => {
@@ -323,6 +374,14 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
         background: "var(--fl-bg)",
       }}
     >
+      <TrendingPopup
+        show={trendingPopup.show}
+        variant={trendingPopup.variant}
+        postSnippet={trendingPopup.postSnippet}
+        authorName={trendingPopup.authorName}
+        likes={trendingPopup.likes}
+        onDismiss={() => setTrendingPopup((p) => ({ ...p, show: false }))}
+      />
       <UsernameTopBar username={username} onRename={onBack} />
 
       {/* Ambient blobs */}
@@ -515,15 +574,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
           }}
         >
           <div className="flex items-start gap-3 mb-4">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
-              style={{
-                background: getAvatarColor(username),
-                color: "oklch(0.98 0 0)",
-              }}
-            >
-              {username[0]?.toUpperCase()}
-            </div>
+            <AnimatedAvatar username={username} size="md" />
             <textarea
               data-ocid="social.textarea"
               value={text}
@@ -653,15 +704,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
             >
               <div className="p-5">
                 <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold"
-                    style={{
-                      background: getAvatarColor(post.username),
-                      color: "oklch(0.98 0 0)",
-                    }}
-                  >
-                    {post.username[0]?.toUpperCase()}
-                  </div>
+                  <AnimatedAvatar username={post.username} size="sm" />
                   <div>
                     <p
                       className="text-sm font-semibold"
@@ -766,15 +809,10 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
                           key={comment.id}
                           className="flex items-start gap-2"
                         >
-                          <div
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                            style={{
-                              background: getAvatarColor(comment.username),
-                              color: "oklch(0.98 0 0)",
-                            }}
-                          >
-                            {comment.username[0]?.toUpperCase()}
-                          </div>
+                          <AnimatedAvatar
+                            username={comment.username}
+                            size="sm"
+                          />
                           <div
                             className="flex-1 rounded-xl px-3 py-2"
                             style={{
@@ -819,15 +857,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
 
                   {/* Comment input */}
                   <div className="flex items-center gap-2 mt-2">
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                      style={{
-                        background: getAvatarColor(username),
-                        color: "oklch(0.98 0 0)",
-                      }}
-                    >
-                      {username[0]?.toUpperCase()}
-                    </div>
+                    <AnimatedAvatar username={username} size="sm" />
                     <input
                       type="text"
                       data-ocid={`social.comment_input.${idx + 1}`}
