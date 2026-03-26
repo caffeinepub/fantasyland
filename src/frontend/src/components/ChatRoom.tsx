@@ -601,8 +601,7 @@ export default function ChatRoom({
     <div
       className="relative flex h-screen overflow-hidden"
       style={{
-        background:
-          "radial-gradient(ellipse at 20% 10%, oklch(0.13 0.05 280) 0%, oklch(0.08 0.025 260) 50%, oklch(0.06 0.02 280) 100%)",
+        background: "var(--fl-bg)",
       }}
     >
       {/* Background image overlay */}
@@ -1353,8 +1352,7 @@ export default function ChatRoom({
             className="relative z-10 w-64 flex-shrink-0 flex flex-col border-l"
             style={{
               borderColor: "oklch(0.22 0.06 280 / 0.5)",
-              background:
-                "linear-gradient(180deg, oklch(0.11 0.04 280 / 0.97) 0%, oklch(0.09 0.03 270 / 0.97) 100%)",
+              background: "var(--fl-surface)",
               backdropFilter: "blur(12px)",
             }}
           >

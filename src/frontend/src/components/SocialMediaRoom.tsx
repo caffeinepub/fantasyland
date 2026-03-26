@@ -320,8 +320,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
     <div
       className="min-h-screen relative overflow-hidden pb-20"
       style={{
-        background:
-          "radial-gradient(ellipse at 30% 20%, oklch(0.14 0.06 280) 0%, oklch(0.09 0.03 260) 40%, oklch(0.07 0.02 280) 100%)",
+        background: "var(--fl-bg)",
       }}
     >
       <UsernameTopBar username={username} onRename={onBack} />
@@ -355,7 +354,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
       {/* Header */}
       <header
         className="relative z-10 flex items-center gap-4 px-6 py-4 border-b"
-        style={{ borderColor: "oklch(0.22 0.06 280 / 0.5)" }}
+        style={{ borderColor: "var(--fl-border)" }}
       >
         <button
           type="button"
@@ -397,7 +396,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
         <div
           className="mb-6 rounded-2xl p-4"
           style={{
-            background: "oklch(0.12 0.035 275)",
+            background: "var(--fl-surface)",
             border: "1px solid oklch(0.65 0.28 305 / 0.2)",
             boxShadow: "0 0 20px oklch(0.65 0.28 305 / 0.06)",
           }}
@@ -510,7 +509,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
         <div
           className="rounded-2xl p-5 mb-8"
           style={{
-            background: "oklch(0.12 0.035 275)",
+            background: "var(--fl-surface)",
             border: "1px solid oklch(0.65 0.28 305 / 0.25)",
             boxShadow: "0 0 24px oklch(0.65 0.28 305 / 0.08)",
           }}
@@ -533,7 +532,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
               rows={3}
               className="flex-1 resize-none bg-transparent outline-none text-sm leading-relaxed placeholder:opacity-40"
               style={{
-                color: "oklch(0.88 0.04 280)",
+                color: "var(--fl-text)",
                 caretColor: "oklch(0.78 0.15 85)",
               }}
             />
@@ -647,8 +646,8 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
               data-ocid={`social.item.${idx + 1}`}
               className="rounded-2xl overflow-hidden transition-all duration-200"
               style={{
-                background: "oklch(0.12 0.035 275)",
-                border: "1px solid oklch(0.22 0.06 280 / 0.5)",
+                background: "var(--fl-surface)",
+                border: "1px solid var(--fl-border)",
                 boxShadow: "0 4px 16px oklch(0 0 0 / 0.25)",
               }}
             >
@@ -666,7 +665,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
                   <div>
                     <p
                       className="text-sm font-semibold"
-                      style={{ color: "oklch(0.88 0.04 280)" }}
+                      style={{ color: "var(--fl-text)" }}
                     >
                       {post.username}
                     </p>
@@ -682,7 +681,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
                 {post.text && (
                   <p
                     className="text-sm leading-relaxed mb-4"
-                    style={{ color: "oklch(0.78 0.05 280)" }}
+                    style={{ color: "var(--fl-text-muted)" }}
                   >
                     {post.text}
                   </p>
@@ -779,8 +778,8 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
                           <div
                             className="flex-1 rounded-xl px-3 py-2"
                             style={{
-                              background: "oklch(0.15 0.04 275)",
-                              border: "1px solid oklch(0.22 0.06 280 / 0.4)",
+                              background: "var(--fl-bg)",
+                              border: "1px solid var(--fl-border)",
                             }}
                           >
                             <div className="flex items-baseline gap-2 mb-0.5">
@@ -845,9 +844,9 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
                       placeholder="Add a comment..."
                       className="flex-1 bg-transparent outline-none text-xs px-3 py-2 rounded-full"
                       style={{
-                        background: "oklch(0.15 0.04 275)",
-                        border: "1px solid oklch(0.25 0.06 280 / 0.6)",
-                        color: "oklch(0.85 0.04 280)",
+                        background: "var(--fl-bg)",
+                        border: "1px solid var(--fl-border)",
+                        color: "var(--fl-text)",
                         caretColor: "oklch(0.72 0.2 200)",
                       }}
                     />
@@ -1017,7 +1016,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
             data-ocid="story.dialog"
             className="w-full max-w-sm mx-4 mb-4 sm:mb-0 rounded-3xl p-6"
             style={{
-              background: "oklch(0.12 0.04 275)",
+              background: "var(--fl-surface)",
               border: "1px solid oklch(0.65 0.28 305 / 0.3)",
               boxShadow: "0 0 40px oklch(0.65 0.28 305 / 0.15)",
             }}
@@ -1053,9 +1052,9 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
               rows={4}
               className="w-full resize-none rounded-xl px-4 py-3 text-sm outline-none mb-4"
               style={{
-                background: "oklch(0.16 0.04 275)",
-                border: "1px solid oklch(0.28 0.06 280 / 0.6)",
-                color: "oklch(0.85 0.04 280)",
+                background: "var(--fl-bg)",
+                border: "1px solid var(--fl-border)",
+                color: "var(--fl-text)",
                 caretColor: "oklch(0.78 0.15 85)",
               }}
             />

@@ -1,22 +1,27 @@
 # FantasyLand
 
 ## Current State
-- Voice message recording uses hold-to-record; on release it auto-sends immediately with no confirmation step
-- Truth or Dare has a mode selector (Strangers / AI); Strangers mode dumps everyone into the shared `truth-dare` room (no 1v1 matchmaking)
+- TruthOrDareRoom has a mode selector (Play with Strangers / Play with AI) already implemented
+- ThemeContext sets CSS variables on document root, but most components use hardcoded oklch dark colors instead of CSS variables, so theme changes only affect elements that read the variables
+- SocialMediaRoom has a Publish button and handlePublish function that works, but uses hardcoded dark colors throughout (not theme-aware)
+- TruthOrDare strangers mode uses ChatRoom with a spin panel, but has no turn indicator showing whose turn it is to spin
 
 ## Requested Changes (Diff)
 
 ### Add
-- After recording stops, show a voice preview bar in the typing area: a small audio player, a green Send icon, and an X cancel icon
-- Truth or Dare: when user picks "Play with Strangers", enter a matchmaking flow (reuse MatchmakingScreen) to match with one other user; on match, enter a private 1v1 room that has both chat and the spin panel overlay
+- Turn indicator in Truth or Dare 1v1 strangers room: show a clear UI element indicating which player's turn it is to spin (alternate turns between the two players; start with the joiner)
 
 ### Modify
-- ChatRoom: `stopRecording` no longer auto-sends; instead stores blob in state. Typing bar shows voice preview row with send/cancel when `pendingVoice` is set
-- TruthOrDareRoom: "Play with Strangers" mode transitions through `matchmaking` state using MatchmakingScreen; on match, use matched roomId for the ChatRoom instead of the static `truth-dare` room
+- Fix themes to apply broadly: update SocialMediaRoom, TruthOrDareRoom, ChatRoom, Lobby, and other key pages to use CSS variables (`var(--fl-bg)`, `var(--fl-surface)`, `var(--fl-border)`, `var(--fl-text)`, `var(--fl-text-muted)`, `var(--fl-accent)`, `var(--fl-header-bg)`) instead of hardcoded dark values wherever possible
+- Fix Social Media publish: ensure the post input textarea, media preview, and publish flow is clearly visible and functional across all themes; make sure the post area background uses theme surface variables
 
 ### Remove
-- Auto-send on recording stop
+- Nothing
 
 ## Implementation Plan
-1. In ChatRoom.tsx: add `pendingVoice` state (Blob | null). stopRecording stores blob, does NOT send. Show preview bar with `<audio>` player, send button (triggers actual send), cancel button (clears blob).
-2. In TruthOrDareRoom.tsx: add `matchmaking` state to the mode enum. When strangers button clicked, set mode to `matchmaking`. Render MatchmakingScreen with onMatched setting mode to `strangers` and storing the matched roomId. Use that roomId for the ChatRoom with spin panel.
+1. Update ThemeContext CSS variables to also set body background-color so page bg changes on theme switch
+2. In SocialMediaRoom.tsx, replace hardcoded dark oklch colors with CSS variable references for: page bg, surface cards, border, text, muted text
+3. In TruthOrDareRoom.tsx, replace hardcoded dark colors with CSS variables; add turn indicator in the strangers room showing "Your turn" vs "Stranger's turn" by tracking spin count
+4. In ChatRoom.tsx, replace hardcoded dark colors on the chat container and message bubbles with CSS variables where feasible
+5. In Lobby.tsx, check and replace hardcoded dark bg/surface/text with CSS variables
+6. Validate build passes

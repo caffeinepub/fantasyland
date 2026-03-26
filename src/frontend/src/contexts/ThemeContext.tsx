@@ -103,6 +103,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.style.setProperty("--fl-accent", t.accent);
     root.style.setProperty("--fl-header-bg", t.headerBg);
     root.setAttribute("data-theme", theme);
+    document.body.style.background = t.bg;
+    document.body.style.color = t.text;
   }, [theme]);
 
   return (

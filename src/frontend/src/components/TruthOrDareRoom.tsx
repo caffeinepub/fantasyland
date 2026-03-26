@@ -110,16 +110,15 @@ function TruthOrDareAI({
     <div
       className="min-h-screen flex flex-col"
       style={{
-        background:
-          "radial-gradient(ellipse at 20% 10%, oklch(0.13 0.05 280) 0%, oklch(0.08 0.025 260) 50%, oklch(0.06 0.02 280) 100%)",
+        background: "var(--fl-bg)",
       }}
     >
       {/* Header */}
       <header
         className="flex items-center gap-3 px-4 py-4 border-b"
         style={{
-          borderColor: "oklch(0.22 0.06 280 / 0.4)",
-          background: "oklch(0.1 0.03 275 / 0.9)",
+          borderColor: "var(--fl-border)",
+          background: "var(--fl-header-bg)",
         }}
       >
         <button
@@ -137,10 +136,7 @@ function TruthOrDareAI({
         </button>
         <span className="text-2xl">🤖</span>
         <div>
-          <h2
-            className="font-bold text-lg"
-            style={{ color: "oklch(0.92 0.04 280)" }}
-          >
+          <h2 className="font-bold text-lg" style={{ color: "var(--fl-text)" }}>
             Play with AI
           </h2>
           <p className="text-xs" style={{ color: "oklch(0.55 0.06 280)" }}>
@@ -345,12 +341,14 @@ export default function TruthOrDareRoom({ username, onBack }: Props) {
     text: string;
   } | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
+  const [spinCount, setSpinCount] = useState(0);
   const { actor } = useActor();
   const qc = useQueryClient();
 
   const spin = async () => {
     if (spinning || !actor) return;
     setSpinning(true);
+    setSpinCount((c) => c + 1);
     const isTruth = Math.random() < 0.5;
     const list = isTruth ? TRUTHS : DARES;
     const picked = list[Math.floor(Math.random() * list.length)];
@@ -372,8 +370,7 @@ export default function TruthOrDareRoom({ username, onBack }: Props) {
       <div
         className="min-h-screen flex flex-col items-center justify-center p-6"
         style={{
-          background:
-            "radial-gradient(ellipse at 20% 10%, oklch(0.13 0.05 280) 0%, oklch(0.08 0.025 260) 50%, oklch(0.06 0.02 280) 100%)",
+          background: "var(--fl-bg)",
         }}
       >
         {/* Back button */}
@@ -441,7 +438,7 @@ export default function TruthOrDareRoom({ username, onBack }: Props) {
               <div>
                 <p
                   className="font-black text-lg mb-1"
-                  style={{ color: "oklch(0.88 0.05 280)" }}
+                  style={{ color: "var(--fl-text)" }}
                 >
                   Play with Strangers
                 </p>
@@ -472,7 +469,7 @@ export default function TruthOrDareRoom({ username, onBack }: Props) {
               <div>
                 <p
                   className="font-black text-lg mb-1"
-                  style={{ color: "oklch(0.88 0.05 280)" }}
+                  style={{ color: "var(--fl-text)" }}
                 >
                   Play with AI
                 </p>
@@ -512,187 +509,211 @@ export default function TruthOrDareRoom({ username, onBack }: Props) {
   }
 
   // Strangers mode (existing ChatRoom with spin panel)
-  const spinPanel = (
-    <div className="flex items-center gap-4 flex-wrap">
-      {/* Back to mode select */}
-      <button
-        type="button"
-        data-ocid="truthdare.strangers.back.button"
-        onClick={() => setMode("select")}
-        className="p-1.5 rounded-lg transition-all hover:scale-105"
-        style={{
-          background: "oklch(0.15 0.04 275)",
-          border: "1px solid oklch(0.22 0.06 280 / 0.5)",
-          color: "oklch(0.7 0.06 280)",
-        }}
-        title="Back to mode selection"
-      >
-        <ArrowLeft size={16} />
-      </button>
+  const isMyTurn = spinCount % 2 === 0;
 
-      <Button
-        type="button"
-        data-ocid="truthdare.spin.button"
-        onClick={spin}
-        disabled={spinning || !actor}
-        className="flex items-center gap-2 px-5 py-2 rounded-xl font-bold transition-all duration-200"
-        style={{
-          background: spinning
-            ? "oklch(0.18 0.04 275)"
-            : "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 25))",
-          color: "oklch(0.95 0.02 280)",
-          border: "none",
-          boxShadow: spinning ? "none" : "0 0 20px oklch(0.65 0.22 50 / 0.4)",
-        }}
-      >
-        <Shuffle size={16} className={spinning ? "animate-spin" : ""} />
-        {spinning ? "Spinning..." : "Spin the Wheel"}
-      </Button>
-      {lastResult && (
-        <button
-          type="button"
-          data-ocid="truthdare.result.button"
-          onClick={() => setShowResultModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
+  const spinPanel = (
+    <div className="flex flex-col gap-2 w-full">
+      {/* Turn indicator */}
+      <div className="flex items-center gap-2">
+        <span
+          className="px-3 py-1 rounded-full text-xs font-bold"
           style={{
-            background:
-              lastResult.type === "truth"
-                ? "oklch(0.6 0.25 250 / 0.15)"
-                : "oklch(0.65 0.22 50 / 0.15)",
-            border: `1px solid ${
-              lastResult.type === "truth"
-                ? "oklch(0.6 0.25 250 / 0.4)"
-                : "oklch(0.65 0.22 50 / 0.4)"
-            }`,
-            color:
-              lastResult.type === "truth"
-                ? "oklch(0.72 0.2 200)"
-                : "oklch(0.72 0.22 55)",
+            background: isMyTurn
+              ? "oklch(0.52 0.18 145 / 0.2)"
+              : "oklch(0.5 0.05 280 / 0.2)",
+            border: isMyTurn
+              ? "1px solid oklch(0.52 0.18 145 / 0.5)"
+              : "1px solid oklch(0.4 0.05 280 / 0.4)",
+            color: isMyTurn ? "oklch(0.72 0.22 145)" : "oklch(0.6 0.05 280)",
           }}
         >
-          <Flame size={14} />
-          <span className="font-bold">
-            {lastResult.type === "truth" ? "TRUTH" : "DARE"}:
-          </span>
-          <span className="text-xs truncate max-w-[120px] sm:max-w-xs">
-            {lastResult.text}
-          </span>
-          <span className="text-xs opacity-60 ml-1">(tap to read)</span>
+          {isMyTurn ? "🎲 Your Turn" : "⏳ Stranger's Turn"}
+        </span>
+        <span className="text-xs" style={{ color: "oklch(0.5 0.05 280)" }}>
+          {isMyTurn ? "Spin to get a prompt!" : "Wait for your partner to spin"}
+        </span>
+      </div>
+      <div className="flex items-center gap-4 flex-wrap">
+        {/* Back to mode select */}
+        <button
+          type="button"
+          data-ocid="truthdare.strangers.back.button"
+          onClick={() => setMode("select")}
+          className="p-1.5 rounded-lg transition-all hover:scale-105"
+          style={{
+            background: "oklch(0.15 0.04 275)",
+            border: "1px solid oklch(0.22 0.06 280 / 0.5)",
+            color: "oklch(0.7 0.06 280)",
+          }}
+          title="Back to mode selection"
+        >
+          <ArrowLeft size={16} />
         </button>
-      )}
 
-      {/* Full result modal */}
-      <AnimatePresence>
-        {showResultModal && lastResult && (
-          <motion.div
-            data-ocid="truthdare.result.modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        <Button
+          type="button"
+          data-ocid="truthdare.spin.button"
+          onClick={spin}
+          disabled={spinning || !actor}
+          className="flex items-center gap-2 px-5 py-2 rounded-xl font-bold transition-all duration-200"
+          style={{
+            background: spinning
+              ? "oklch(0.18 0.04 275)"
+              : "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 25))",
+            color: "oklch(0.95 0.02 280)",
+            border: "none",
+            boxShadow: spinning ? "none" : "0 0 20px oklch(0.65 0.22 50 / 0.4)",
+          }}
+        >
+          <Shuffle size={16} className={spinning ? "animate-spin" : ""} />
+          {spinning ? "Spinning..." : "Spin the Wheel"}
+        </Button>
+        {lastResult && (
+          <button
+            type="button"
+            data-ocid="truthdare.result.button"
+            onClick={() => setShowResultModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
             style={{
-              background: "oklch(0 0 0 / 0.75)",
-              backdropFilter: "blur(8px)",
+              background:
+                lastResult.type === "truth"
+                  ? "oklch(0.6 0.25 250 / 0.15)"
+                  : "oklch(0.65 0.22 50 / 0.15)",
+              border: `1px solid ${
+                lastResult.type === "truth"
+                  ? "oklch(0.6 0.25 250 / 0.4)"
+                  : "oklch(0.65 0.22 50 / 0.4)"
+              }`,
+              color:
+                lastResult.type === "truth"
+                  ? "oklch(0.72 0.2 200)"
+                  : "oklch(0.72 0.22 55)",
             }}
-            onClick={() => setShowResultModal(false)}
           >
+            <Flame size={14} />
+            <span className="font-bold">
+              {lastResult.type === "truth" ? "TRUTH" : "DARE"}:
+            </span>
+            <span className="text-xs truncate max-w-[120px] sm:max-w-xs">
+              {lastResult.text}
+            </span>
+            <span className="text-xs opacity-60 ml-1">(tap to read)</span>
+          </button>
+        )}
+
+        {/* Full result modal */}
+        <AnimatePresence>
+          {showResultModal && lastResult && (
             <motion.div
-              initial={{ scale: 0.85, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.85, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 380, damping: 28 }}
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-sm rounded-3xl p-6 flex flex-col gap-5"
+              data-ocid="truthdare.result.modal"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
               style={{
-                background:
-                  lastResult.type === "truth"
-                    ? "linear-gradient(145deg, oklch(0.13 0.06 250), oklch(0.09 0.04 240))"
-                    : "linear-gradient(145deg, oklch(0.14 0.06 50), oklch(0.09 0.04 30))",
-                border: `1px solid ${
-                  lastResult.type === "truth"
-                    ? "oklch(0.6 0.25 250 / 0.5)"
-                    : "oklch(0.65 0.22 50 / 0.5)"
-                }`,
-                boxShadow: `0 0 60px ${
-                  lastResult.type === "truth"
-                    ? "oklch(0.6 0.25 250 / 0.25)"
-                    : "oklch(0.65 0.22 50 / 0.25)"
-                }`,
+                background: "oklch(0 0 0 / 0.75)",
+                backdropFilter: "blur(8px)",
               }}
+              onClick={() => setShowResultModal(false)}
             >
-              {/* Close button */}
-              <button
-                type="button"
-                data-ocid="truthdare.result.close_button"
-                onClick={() => setShowResultModal(false)}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110"
-                style={{
-                  background: "oklch(0.16 0.05 280)",
-                  border: "1px solid oklch(0.28 0.08 280 / 0.6)",
-                  color: "oklch(0.7 0.06 280)",
-                }}
-              >
-                <X size={14} />
-              </button>
-
-              {/* Type badge */}
-              <div className="flex items-center gap-3">
-                <div className="text-4xl">
-                  {lastResult.type === "truth" ? "🔵" : "🔥"}
-                </div>
-                <div>
-                  <p
-                    className="text-xs font-black tracking-widest uppercase"
-                    style={{
-                      color:
-                        lastResult.type === "truth"
-                          ? "oklch(0.6 0.2 250)"
-                          : "oklch(0.65 0.22 50)",
-                    }}
-                  >
-                    {lastResult.type === "truth" ? "Truth" : "Dare"}
-                  </p>
-                  <p
-                    className="text-xs"
-                    style={{ color: "oklch(0.5 0.05 280)" }}
-                  >
-                    Spin result for {username}
-                  </p>
-                </div>
-              </div>
-
-              {/* Full text */}
-              <p
-                className="text-base leading-relaxed font-medium"
-                style={{ color: "oklch(0.92 0.04 280)" }}
-              >
-                {lastResult.text}
-              </p>
-
-              {/* Spin again button */}
-              <button
-                type="button"
-                data-ocid="truthdare.spinagain.button"
-                onClick={() => {
-                  setShowResultModal(false);
-                  spin();
-                }}
-                disabled={spinning}
-                className="py-2.5 rounded-2xl font-bold text-sm transition-all hover:scale-105 disabled:opacity-50"
+              <motion.div
+                initial={{ scale: 0.85, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.85, opacity: 0, y: 20 }}
+                transition={{ type: "spring", stiffness: 380, damping: 28 }}
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-sm rounded-3xl p-6 flex flex-col gap-5"
                 style={{
                   background:
                     lastResult.type === "truth"
-                      ? "linear-gradient(135deg, oklch(0.55 0.25 250), oklch(0.5 0.22 240))"
-                      : "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 25))",
-                  color: "oklch(0.97 0.02 280)",
+                      ? "linear-gradient(145deg, oklch(0.13 0.06 250), oklch(0.09 0.04 240))"
+                      : "linear-gradient(145deg, oklch(0.14 0.06 50), oklch(0.09 0.04 30))",
+                  border: `1px solid ${
+                    lastResult.type === "truth"
+                      ? "oklch(0.6 0.25 250 / 0.5)"
+                      : "oklch(0.65 0.22 50 / 0.5)"
+                  }`,
+                  boxShadow: `0 0 60px ${
+                    lastResult.type === "truth"
+                      ? "oklch(0.6 0.25 250 / 0.25)"
+                      : "oklch(0.65 0.22 50 / 0.25)"
+                  }`,
                 }}
               >
-                🎲 Spin Again
-              </button>
+                {/* Close button */}
+                <button
+                  type="button"
+                  data-ocid="truthdare.result.close_button"
+                  onClick={() => setShowResultModal(false)}
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                  style={{
+                    background: "oklch(0.16 0.05 280)",
+                    border: "1px solid oklch(0.28 0.08 280 / 0.6)",
+                    color: "oklch(0.7 0.06 280)",
+                  }}
+                >
+                  <X size={14} />
+                </button>
+
+                {/* Type badge */}
+                <div className="flex items-center gap-3">
+                  <div className="text-4xl">
+                    {lastResult.type === "truth" ? "🔵" : "🔥"}
+                  </div>
+                  <div>
+                    <p
+                      className="text-xs font-black tracking-widest uppercase"
+                      style={{
+                        color:
+                          lastResult.type === "truth"
+                            ? "oklch(0.6 0.2 250)"
+                            : "oklch(0.65 0.22 50)",
+                      }}
+                    >
+                      {lastResult.type === "truth" ? "Truth" : "Dare"}
+                    </p>
+                    <p
+                      className="text-xs"
+                      style={{ color: "oklch(0.5 0.05 280)" }}
+                    >
+                      Spin result for {username}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Full text */}
+                <p
+                  className="text-base leading-relaxed font-medium"
+                  style={{ color: "oklch(0.92 0.04 280)" }}
+                >
+                  {lastResult.text}
+                </p>
+
+                {/* Spin again button */}
+                <button
+                  type="button"
+                  data-ocid="truthdare.spinagain.button"
+                  onClick={() => {
+                    setShowResultModal(false);
+                    spin();
+                  }}
+                  disabled={spinning}
+                  className="py-2.5 rounded-2xl font-bold text-sm transition-all hover:scale-105 disabled:opacity-50"
+                  style={{
+                    background:
+                      lastResult.type === "truth"
+                        ? "linear-gradient(135deg, oklch(0.55 0.25 250), oklch(0.5 0.22 240))"
+                        : "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 25))",
+                    color: "oklch(0.97 0.02 280)",
+                  }}
+                >
+                  🎲 Spin Again
+                </button>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 

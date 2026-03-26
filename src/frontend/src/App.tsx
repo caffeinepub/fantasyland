@@ -141,7 +141,7 @@ function AppInner() {
       {splashDone && !sessionChecked && (
         <div
           className="min-h-screen flex items-center justify-center"
-          style={{ background: "oklch(0.08 0.025 260)" }}
+          style={{ background: "var(--fl-bg)" }}
         >
           <div className="w-8 h-8 rounded-full border-2 border-purple-500/30 border-t-purple-500 animate-spin" />
         </div>
