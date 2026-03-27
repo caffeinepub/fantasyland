@@ -7,6 +7,7 @@ interface Props {
   postSnippet: string;
   authorName: string;
   likes: number;
+  views?: number;
   onDismiss: () => void;
 }
 
@@ -16,6 +17,7 @@ export default function TrendingPopup({
   postSnippet,
   authorName,
   likes,
+  views,
   onDismiss,
 }: Props) {
   useEffect(() => {
@@ -92,7 +94,9 @@ export default function TrendingPopup({
                       : "oklch(0.75 0.25 30)",
                   }}
                 >
-                  ❤️ {likes} likes
+                  {isViral && views != null
+                    ? `👁 ${views} views`
+                    : `❤️ ${likes} likes`}
                 </p>
               </div>
             </div>

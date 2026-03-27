@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Camera,
+  Eye,
   Heart,
   Home,
   Image,
@@ -19,6 +20,12 @@ import CameraModal from "./CameraModal";
 import TrendingPopup from "./TrendingPopup";
 import UsernameTopBar from "./UsernameTopBar";
 
+// DEV_TRENDING: divide thresholds by 100 so testers can see popups without needing real viral numbers.
+// Set to false in production when real thresholds (1000 likes / 10000 views) should apply.
+const DEV_TRENDING = true;
+const TRENDING_LIKES = DEV_TRENDING ? 10 : 1000;
+const VIRAL_VIEWS = DEV_TRENDING ? 100 : 10000;
+
 interface Comment {
   id: number;
   username: string;
@@ -35,6 +42,7 @@ interface Post {
   mediaType?: "image" | "video";
   likes: number;
   liked: boolean;
+  views: number;
   comments: Comment[];
   showComments: boolean;
 }
@@ -62,6 +70,7 @@ const SAMPLE_POSTS: Post[] = [
     text: "Just entered the FantasyLand portal for the first time. The energy here is unreal ✨ Can't believe I waited this long!",
     likes: 12,
     liked: false,
+    views: 0,
     comments: [
       {
         id: 1,
@@ -79,6 +88,7 @@ const SAMPLE_POSTS: Post[] = [
     text: "Writing my first blog post from the Chill Lounge. The vibes here are immaculate. Who else loves late night fantasy chats? 🌙",
     likes: 27,
     liked: false,
+    views: 0,
     comments: [],
     showComments: false,
   },
@@ -89,6 +99,7 @@ const SAMPLE_POSTS: Post[] = [
     text: "Just beat someone at Truth or Dare. They had to confess their deepest secret. I'll never tell 🤫",
     likes: 45,
     liked: false,
+    views: 0,
     comments: [
       {
         id: 1,
@@ -185,6 +196,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
     postSnippet: string;
     authorName: string;
     likes: number;
+    views?: number;
   }>({
     show: false,
     variant: "trending",
@@ -193,6 +205,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
     likes: 0,
   });
   const shownTrending = useRef<Set<string>>(new Set());
+  const viewedPosts = useRef<Set<number>>(new Set());
 
   // Stories state
   const [stories, setStories] = useState<Story[]>(SAMPLE_STORIES);
@@ -283,6 +296,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
       mediaType: mediaType ?? undefined,
       likes: 0,
       liked: false,
+      views: 0,
       comments: [],
       showComments: false,
     };
@@ -307,7 +321,10 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
       const post = updated.find((p) => p.id === id);
       if (post && !post.liked === false) {
         const key = `post-${id}`;
-        if (post.likes >= 20 && !shownTrending.current.has(`viral-${key}`)) {
+        if (
+          post.views >= VIRAL_VIEWS &&
+          !shownTrending.current.has(`viral-${key}`)
+        ) {
           shownTrending.current.add(`viral-${key}`);
           setTimeout(
             () =>
@@ -317,11 +334,12 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
                 postSnippet: post.text,
                 authorName: post.username,
                 likes: post.likes,
+                views: post.views,
               }),
             50,
           );
         } else if (
-          post.likes >= 10 &&
+          post.likes >= TRENDING_LIKES &&
           !shownTrending.current.has(`trending-${key}`)
         ) {
           shownTrending.current.add(`trending-${key}`);
@@ -380,6 +398,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
         postSnippet={trendingPopup.postSnippet}
         authorName={trendingPopup.authorName}
         likes={trendingPopup.likes}
+        views={trendingPopup.views}
         onDismiss={() => setTrendingPopup((p) => ({ ...p, show: false }))}
       />
       <UsernameTopBar username={username} onRename={onBack} />
@@ -612,10 +631,10 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
           )}
 
           <div
-            className="flex items-center justify-between pt-3"
+            className="flex flex-wrap items-center gap-2 pt-3"
             style={{ borderTop: "1px solid oklch(0.22 0.06 280 / 0.3)" }}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
               <input
                 ref={fileRef}
                 type="file"
@@ -666,7 +685,7 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
               data-ocid="social.submit_button"
               onClick={handlePublish}
               disabled={!text.trim() && !mediaPreview}
-              className="flex items-center gap-2 px-5 py-2 rounded-full text-sm font-bold transition-all duration-200 disabled:opacity-40"
+              className="flex items-center gap-2 px-5 py-2 rounded-full text-sm font-bold transition-all duration-200 disabled:opacity-40 flex-shrink-0"
               style={{
                 background:
                   "linear-gradient(135deg, oklch(0.65 0.28 305), oklch(0.7 0.28 330))",
@@ -691,215 +710,239 @@ export default function SocialMediaRoom({ username, onBack }: Props) {
               <p className="text-sm">No posts yet. Be the first to share!</p>
             </div>
           )}
-          {posts.map((post, idx) => (
-            <article
-              key={post.id}
-              data-ocid={`social.item.${idx + 1}`}
-              className="rounded-2xl overflow-hidden transition-all duration-200"
-              style={{
-                background: "var(--fl-surface)",
-                border: "1px solid var(--fl-border)",
-                boxShadow: "0 4px 16px oklch(0 0 0 / 0.25)",
-              }}
-            >
-              <div className="p-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <AnimatedAvatar username={post.username} size="sm" />
-                  <div>
-                    <p
-                      className="text-sm font-semibold"
-                      style={{ color: "var(--fl-text)" }}
-                    >
-                      {post.username}
-                    </p>
-                    <p
-                      className="text-xs"
-                      style={{ color: "oklch(0.5 0.06 280)" }}
-                    >
-                      {timeAgo(post.timestamp)}
-                    </p>
+          {posts.map((post, idx) => {
+            // Track views: increment once per post per session
+            if (!viewedPosts.current.has(post.id)) {
+              viewedPosts.current.add(post.id);
+              setTimeout(() => {
+                setPosts((prev) =>
+                  prev.map((p) =>
+                    p.id === post.id ? { ...p, views: p.views + 1 } : p,
+                  ),
+                );
+              }, 0);
+            }
+            return (
+              <article
+                key={post.id}
+                data-ocid={`social.item.${idx + 1}`}
+                className="rounded-2xl overflow-hidden transition-all duration-200"
+                style={{
+                  background: "var(--fl-surface)",
+                  border: "1px solid var(--fl-border)",
+                  boxShadow: "0 4px 16px oklch(0 0 0 / 0.25)",
+                }}
+              >
+                <div className="p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <AnimatedAvatar username={post.username} size="sm" />
+                    <div>
+                      <p
+                        className="text-sm font-semibold"
+                        style={{ color: "var(--fl-text)" }}
+                      >
+                        {post.username}
+                      </p>
+                      <p
+                        className="text-xs"
+                        style={{ color: "oklch(0.5 0.06 280)" }}
+                      >
+                        {timeAgo(post.timestamp)}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                {post.text && (
-                  <p
-                    className="text-sm leading-relaxed mb-4"
-                    style={{ color: "var(--fl-text-muted)" }}
-                  >
-                    {post.text}
-                  </p>
-                )}
+                  {post.text && (
+                    <p
+                      className="text-sm leading-relaxed mb-4"
+                      style={{ color: "var(--fl-text-muted)" }}
+                    >
+                      {post.text}
+                    </p>
+                  )}
 
-                {post.mediaUrl && (
-                  <div
-                    className="rounded-xl overflow-hidden mb-4"
-                    style={{ border: "1px solid oklch(0.22 0.06 280 / 0.4)" }}
-                  >
-                    {post.mediaType === "video" ? (
-                      // biome-ignore lint/a11y/useMediaCaption: user-uploaded content
-                      <video
-                        src={post.mediaUrl}
-                        controls
-                        className="w-full max-h-80 object-contain"
-                      />
-                    ) : (
-                      <img
-                        src={post.mediaUrl}
-                        alt="post media"
-                        className="w-full max-h-80 object-cover"
-                      />
-                    )}
-                  </div>
-                )}
-
-                <div
-                  className="flex items-center gap-4 pt-2"
-                  style={{ borderTop: "1px solid oklch(0.18 0.04 280 / 0.5)" }}
-                >
-                  <button
-                    type="button"
-                    data-ocid={`social.like_button.${idx + 1}`}
-                    onClick={() => handleLike(post.id)}
-                    className="flex items-center gap-1.5 text-sm font-medium transition-all duration-200"
-                    style={{
-                      color: post.liked
-                        ? "oklch(0.7 0.28 330)"
-                        : "oklch(0.5 0.06 280)",
-                    }}
-                  >
-                    <Heart
-                      size={16}
-                      fill={post.liked ? "currentColor" : "none"}
-                      style={{ transition: "transform 0.15s ease" }}
-                    />
-                    {post.likes}
-                  </button>
-                  <button
-                    type="button"
-                    data-ocid={`social.comment_button.${idx + 1}`}
-                    onClick={() => handleToggleComments(post.id)}
-                    className="flex items-center gap-1.5 text-sm font-medium transition-all duration-200"
-                    style={{
-                      color: post.showComments
-                        ? "oklch(0.72 0.2 200)"
-                        : "oklch(0.5 0.06 280)",
-                    }}
-                  >
-                    <MessageCircle
-                      size={16}
-                      fill={post.showComments ? "currentColor" : "none"}
-                    />
-                    {post.comments.length > 0 ? post.comments.length : ""}{" "}
-                    Comment{post.comments.length !== 1 ? "s" : ""}
-                  </button>
-                </div>
-              </div>
-
-              {/* Comments section */}
-              {post.showComments && (
-                <div
-                  className="px-5 pb-5"
-                  style={{ borderTop: "1px solid oklch(0.16 0.04 280 / 0.6)" }}
-                >
-                  {/* Comment list */}
-                  {post.comments.length > 0 && (
-                    <div className="pt-4 space-y-3 mb-4">
-                      {post.comments.map((comment) => (
-                        <div
-                          key={comment.id}
-                          className="flex items-start gap-2"
-                        >
-                          <AnimatedAvatar
-                            username={comment.username}
-                            size="sm"
-                          />
-                          <div
-                            className="flex-1 rounded-xl px-3 py-2"
-                            style={{
-                              background: "var(--fl-bg)",
-                              border: "1px solid var(--fl-border)",
-                            }}
-                          >
-                            <div className="flex items-baseline gap-2 mb-0.5">
-                              <span
-                                className="text-xs font-semibold"
-                                style={{ color: "oklch(0.78 0.15 85)" }}
-                              >
-                                {comment.username}
-                              </span>
-                              <span
-                                className="text-xs"
-                                style={{ color: "oklch(0.45 0.05 280)" }}
-                              >
-                                {timeAgo(comment.timestamp)}
-                              </span>
-                            </div>
-                            <p
-                              className="text-xs leading-relaxed"
-                              style={{ color: "oklch(0.75 0.05 280)" }}
-                            >
-                              {comment.text}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                  {post.mediaUrl && (
+                    <div
+                      className="rounded-xl overflow-hidden mb-4"
+                      style={{ border: "1px solid oklch(0.22 0.06 280 / 0.4)" }}
+                    >
+                      {post.mediaType === "video" ? (
+                        // biome-ignore lint/a11y/useMediaCaption: user-uploaded content
+                        <video
+                          src={post.mediaUrl}
+                          controls
+                          className="w-full max-h-80 object-contain"
+                        />
+                      ) : (
+                        <img
+                          src={post.mediaUrl}
+                          alt="post media"
+                          className="w-full max-h-80 object-cover"
+                        />
+                      )}
                     </div>
                   )}
 
-                  {post.comments.length === 0 && (
-                    <p
-                      className="text-xs text-center py-3"
-                      style={{ color: "oklch(0.45 0.05 280)" }}
-                    >
-                      No comments yet. Be the first!
-                    </p>
-                  )}
-
-                  {/* Comment input */}
-                  <div className="flex items-center gap-2 mt-2">
-                    <AnimatedAvatar username={username} size="sm" />
-                    <input
-                      type="text"
-                      data-ocid={`social.comment_input.${idx + 1}`}
-                      value={commentInputs[post.id] ?? ""}
-                      onChange={(e) =>
-                        setCommentInputs((prev) => ({
-                          ...prev,
-                          [post.id]: e.target.value,
-                        }))
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddComment(post.id);
-                      }}
-                      placeholder="Add a comment..."
-                      className="flex-1 bg-transparent outline-none text-xs px-3 py-2 rounded-full"
-                      style={{
-                        background: "var(--fl-bg)",
-                        border: "1px solid var(--fl-border)",
-                        color: "var(--fl-text)",
-                        caretColor: "oklch(0.72 0.2 200)",
-                      }}
-                    />
+                  <div
+                    className="flex items-center gap-4 pt-2"
+                    style={{
+                      borderTop: "1px solid oklch(0.18 0.04 280 / 0.5)",
+                    }}
+                  >
                     <button
                       type="button"
-                      data-ocid={`social.comment_submit.${idx + 1}`}
-                      onClick={() => handleAddComment(post.id)}
-                      disabled={!(commentInputs[post.id] ?? "").trim()}
-                      className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 disabled:opacity-40"
+                      data-ocid={`social.like_button.${idx + 1}`}
+                      onClick={() => handleLike(post.id)}
+                      className="flex items-center gap-1.5 text-sm font-medium transition-all duration-200"
                       style={{
-                        background:
-                          "linear-gradient(135deg, oklch(0.65 0.28 305), oklch(0.7 0.28 330))",
-                        color: "oklch(0.98 0 0)",
-                        boxShadow: "0 0 10px oklch(0.65 0.28 305 / 0.35)",
+                        color: post.liked
+                          ? "oklch(0.7 0.28 330)"
+                          : "oklch(0.5 0.06 280)",
                       }}
                     >
-                      <Send size={13} />
+                      <Heart
+                        size={16}
+                        fill={post.liked ? "currentColor" : "none"}
+                        style={{ transition: "transform 0.15s ease" }}
+                      />
+                      {post.likes}
+                    </button>
+                    <span
+                      className="flex items-center gap-1.5 text-sm"
+                      style={{ color: "oklch(0.5 0.06 280)" }}
+                    >
+                      <Eye size={15} />
+                      {post.views}
+                    </span>
+                    <button
+                      type="button"
+                      data-ocid={`social.comment_button.${idx + 1}`}
+                      onClick={() => handleToggleComments(post.id)}
+                      className="flex items-center gap-1.5 text-sm font-medium transition-all duration-200"
+                      style={{
+                        color: post.showComments
+                          ? "oklch(0.72 0.2 200)"
+                          : "oklch(0.5 0.06 280)",
+                      }}
+                    >
+                      <MessageCircle
+                        size={16}
+                        fill={post.showComments ? "currentColor" : "none"}
+                      />
+                      {post.comments.length > 0 ? post.comments.length : ""}{" "}
+                      Comment{post.comments.length !== 1 ? "s" : ""}
                     </button>
                   </div>
                 </div>
-              )}
-            </article>
-          ))}
+
+                {/* Comments section */}
+                {post.showComments && (
+                  <div
+                    className="px-5 pb-5"
+                    style={{
+                      borderTop: "1px solid oklch(0.16 0.04 280 / 0.6)",
+                    }}
+                  >
+                    {/* Comment list */}
+                    {post.comments.length > 0 && (
+                      <div className="pt-4 space-y-3 mb-4">
+                        {post.comments.map((comment) => (
+                          <div
+                            key={comment.id}
+                            className="flex items-start gap-2"
+                          >
+                            <AnimatedAvatar
+                              username={comment.username}
+                              size="sm"
+                            />
+                            <div
+                              className="flex-1 rounded-xl px-3 py-2"
+                              style={{
+                                background: "var(--fl-bg)",
+                                border: "1px solid var(--fl-border)",
+                              }}
+                            >
+                              <div className="flex items-baseline gap-2 mb-0.5">
+                                <span
+                                  className="text-xs font-semibold"
+                                  style={{ color: "oklch(0.78 0.15 85)" }}
+                                >
+                                  {comment.username}
+                                </span>
+                                <span
+                                  className="text-xs"
+                                  style={{ color: "oklch(0.45 0.05 280)" }}
+                                >
+                                  {timeAgo(comment.timestamp)}
+                                </span>
+                              </div>
+                              <p
+                                className="text-xs leading-relaxed"
+                                style={{ color: "oklch(0.75 0.05 280)" }}
+                              >
+                                {comment.text}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {post.comments.length === 0 && (
+                      <p
+                        className="text-xs text-center py-3"
+                        style={{ color: "oklch(0.45 0.05 280)" }}
+                      >
+                        No comments yet. Be the first!
+                      </p>
+                    )}
+
+                    {/* Comment input */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <AnimatedAvatar username={username} size="sm" />
+                      <input
+                        type="text"
+                        data-ocid={`social.comment_input.${idx + 1}`}
+                        value={commentInputs[post.id] ?? ""}
+                        onChange={(e) =>
+                          setCommentInputs((prev) => ({
+                            ...prev,
+                            [post.id]: e.target.value,
+                          }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleAddComment(post.id);
+                        }}
+                        placeholder="Add a comment..."
+                        className="flex-1 bg-transparent outline-none text-xs px-3 py-2 rounded-full"
+                        style={{
+                          background: "var(--fl-bg)",
+                          border: "1px solid var(--fl-border)",
+                          color: "var(--fl-text)",
+                          caretColor: "oklch(0.72 0.2 200)",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        data-ocid={`social.comment_submit.${idx + 1}`}
+                        onClick={() => handleAddComment(post.id)}
+                        disabled={!(commentInputs[post.id] ?? "").trim()}
+                        className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 disabled:opacity-40"
+                        style={{
+                          background:
+                            "linear-gradient(135deg, oklch(0.65 0.28 305), oklch(0.7 0.28 330))",
+                          color: "oklch(0.98 0 0)",
+                          boxShadow: "0 0 10px oklch(0.65 0.28 305 / 0.35)",
+                        }}
+                      >
+                        <Send size={13} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
         </div>
       </main>
 

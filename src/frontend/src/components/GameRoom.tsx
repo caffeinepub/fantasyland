@@ -655,7 +655,10 @@ function DuelGame() {
     "pick_game" | "rps_play" | "ttt_play" | "result"
   >("pick_game");
   const [opponent] = useState(
-    () => OPPONENT_NAMES[Math.floor(Math.random() * OPPONENT_NAMES.length)],
+    () =>
+      MATCH_OPPONENT_NAMES[
+        Math.floor(Math.random() * MATCH_OPPONENT_NAMES.length)
+      ],
   );
   const [rpsPlayerChoice, setRpsPlayerChoice] = useState<number | null>(null);
   const [rpsOppChoice, setRpsOppChoice] = useState<number | null>(null);
@@ -1190,9 +1193,27 @@ function LeaderboardPanel({
   );
 }
 
+const MATCH_OPPONENT_NAMES = [
+  "Shadow",
+  "Blaze",
+  "Viper",
+  "Nova",
+  "Ryzen",
+  "Crypt",
+  "Glitch",
+  "Phantom",
+];
+
 export default function GameRoom({ username, onRename, onBack }: Props) {
   const [activeTab, setActiveTab] = useState<GameTab>("rps");
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [gamePlayMode, setGamePlayMode] = useState<null | "ai" | "stranger">(
+    null,
+  );
+  const [matchPhase, setMatchPhase] = useState<
+    "searching" | "matched" | "playing"
+  >("searching");
+  const [opponentName, setOpponentName] = useState("");
   const uid = (() => {
     try {
       return localStorage.getItem("fantasyUID") || username;
@@ -1241,6 +1262,183 @@ export default function GameRoom({ username, onRename, onBack }: Props) {
       }}
     >
       <UsernameTopBar username={username} onRename={onRename} />
+
+      {/* ── Mode selector overlay ── */}
+      {gamePlayMode === null && (
+        <div
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center p-6"
+          style={{ background: "oklch(0.09 0.03 265 / 0.97)" }}
+        >
+          <button
+            type="button"
+            data-ocid="gamezone.mode.back.button"
+            onClick={onBack}
+            className="absolute top-6 left-6 flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
+            style={{
+              background: "oklch(0.15 0.04 275)",
+              border: "1px solid oklch(0.22 0.06 280 / 0.5)",
+              color: "oklch(0.75 0.06 280)",
+            }}
+          >
+            <ArrowLeft size={16} /> Lobby
+          </button>
+          <div className="text-center mb-10">
+            <div className="text-5xl mb-3">🎮</div>
+            <h2
+              className="text-3xl font-black mb-2"
+              style={{
+                background:
+                  "linear-gradient(135deg, oklch(0.82 0.2 55), oklch(0.72 0.25 305))",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              Game Zone
+            </h2>
+            <p className="text-sm" style={{ color: "oklch(0.55 0.06 280)" }}>
+              How do you want to play?
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full max-w-md">
+            <button
+              type="button"
+              data-ocid="gamezone.mode.ai.button"
+              onClick={() => setGamePlayMode("ai")}
+              className="group flex flex-col items-center gap-4 p-7 rounded-3xl transition-all duration-200 hover:scale-105"
+              style={{
+                background:
+                  "linear-gradient(145deg, oklch(0.15 0.06 280), oklch(0.12 0.05 260))",
+                border: "1px solid oklch(0.55 0.25 305 / 0.5)",
+                boxShadow: "0 0 30px oklch(0.55 0.25 305 / 0.15)",
+              }}
+            >
+              <div className="text-5xl">🤖</div>
+              <div className="text-center">
+                <p
+                  className="text-lg font-black mb-1"
+                  style={{ color: "oklch(0.88 0.04 280)" }}
+                >
+                  Play with AI
+                </p>
+                <p
+                  className="text-xs"
+                  style={{ color: "oklch(0.55 0.06 280)" }}
+                >
+                  Play solo games against the AI
+                </p>
+              </div>
+            </button>
+            <button
+              type="button"
+              data-ocid="gamezone.mode.stranger.button"
+              onClick={() => {
+                setGamePlayMode("stranger");
+                setMatchPhase("searching");
+                const delay = 2000 + Math.random() * 2000;
+                const name =
+                  OPPONENT_NAMES[
+                    Math.floor(Math.random() * OPPONENT_NAMES.length)
+                  ];
+                setTimeout(() => {
+                  setOpponentName(name);
+                  setMatchPhase("matched");
+                  setTimeout(() => setMatchPhase("playing"), 1500);
+                }, delay);
+              }}
+              className="group flex flex-col items-center gap-4 p-7 rounded-3xl transition-all duration-200 hover:scale-105"
+              style={{
+                background:
+                  "linear-gradient(145deg, oklch(0.15 0.06 55), oklch(0.12 0.04 50))",
+                border: "1px solid oklch(0.65 0.22 55 / 0.5)",
+                boxShadow: "0 0 30px oklch(0.65 0.22 55 / 0.15)",
+              }}
+            >
+              <div className="text-5xl">👥</div>
+              <div className="text-center">
+                <p
+                  className="text-lg font-black mb-1"
+                  style={{ color: "oklch(0.88 0.04 280)" }}
+                >
+                  Play with Strangers
+                </p>
+                <p
+                  className="text-xs"
+                  style={{ color: "oklch(0.55 0.06 280)" }}
+                >
+                  Match with a real opponent and challenge them
+                </p>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Stranger matchmaking overlay ── */}
+      {gamePlayMode === "stranger" && matchPhase === "searching" && (
+        <div
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-6"
+          style={{ background: "oklch(0.09 0.03 265 / 0.97)" }}
+        >
+          <div
+            className="text-6xl animate-spin"
+            style={{ animationDuration: "2s" }}
+          >
+            🔍
+          </div>
+          <p
+            className="text-xl font-bold"
+            style={{ color: "oklch(0.88 0.04 280)" }}
+          >
+            Finding an opponent...
+          </p>
+          <p className="text-sm" style={{ color: "oklch(0.5 0.06 280)" }}>
+            Please wait
+          </p>
+          <button
+            type="button"
+            data-ocid="gamezone.matchmaking.cancel.button"
+            onClick={() => setGamePlayMode(null)}
+            className="px-5 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105"
+            style={{
+              background: "oklch(0.55 0.25 25 / 0.15)",
+              border: "1px solid oklch(0.6 0.25 25 / 0.5)",
+              color: "oklch(0.78 0.22 30)",
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {gamePlayMode === "stranger" && matchPhase === "matched" && (
+        <div
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4"
+          style={{ background: "oklch(0.09 0.03 265 / 0.97)" }}
+        >
+          <div className="text-6xl animate-bounce">⚡</div>
+          <p
+            className="text-2xl font-black"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.82 0.2 55), oklch(0.72 0.25 305))",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            Opponent Found!
+          </p>
+          <p
+            className="text-base font-semibold"
+            style={{ color: "oklch(0.75 0.15 305)" }}
+          >
+            Playing against{" "}
+            <span style={{ color: "oklch(0.82 0.2 55)" }}>{opponentName}</span>
+          </p>
+          <p className="text-sm" style={{ color: "oklch(0.5 0.06 280)" }}>
+            Get ready...
+          </p>
+        </div>
+      )}
 
       {/* Ambient glow */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -1315,10 +1513,60 @@ export default function GameRoom({ username, onRename, onBack }: Props) {
             <Trophy size={14} />
             <span className="hidden sm:inline">Leaderboard</span>
           </button>
+          {gamePlayMode === "ai" && (
+            <button
+              type="button"
+              data-ocid="gamezone.mode.change.button"
+              onClick={() => setGamePlayMode(null)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs transition-all hover:scale-105"
+              style={{
+                background: "oklch(0.16 0.04 275)",
+                border: "1px solid oklch(0.22 0.06 280 / 0.5)",
+                color: "oklch(0.65 0.06 280)",
+              }}
+            >
+              <ArrowLeft size={13} /> Mode
+            </button>
+          )}
+          {gamePlayMode === "stranger" && matchPhase === "playing" && (
+            <div className="flex items-center gap-2">
+              <span
+                className="text-xs font-bold hidden sm:flex items-center gap-1"
+                style={{ color: "oklch(0.72 0.2 55)" }}
+              >
+                <Zap size={12} /> vs {opponentName}
+              </span>
+              <button
+                type="button"
+                data-ocid="gamezone.match.leave.button"
+                onClick={() => {
+                  setGamePlayMode(null);
+                  setMatchPhase("searching");
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs transition-all hover:scale-105"
+                style={{
+                  background: "oklch(0.55 0.25 25 / 0.15)",
+                  border: "1px solid oklch(0.6 0.25 25 / 0.5)",
+                  color: "oklch(0.78 0.22 30)",
+                }}
+              >
+                <X size={13} /> Leave
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
-      <div className="relative z-10 max-w-2xl mx-auto px-4 py-6">
+      <div
+        className="relative z-10 max-w-2xl mx-auto px-4 py-6"
+        style={{
+          visibility:
+            gamePlayMode === null ||
+            (gamePlayMode === "stranger" && matchPhase !== "playing")
+              ? "hidden"
+              : "visible",
+        }}
+      >
         {/* Pending Challenges Banner */}
         {visibleChallenges.length > 0 && (
           <div

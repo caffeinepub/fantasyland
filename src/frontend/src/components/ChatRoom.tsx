@@ -714,6 +714,44 @@ export default function ChatRoom({
                 {onlineUsers.length > 0 ? onlineUsers.length : ""} online
               </span>
             </button>
+            {isStranger && (
+              <button
+                type="button"
+                data-ocid="chat.talk.button"
+                onClick={async () => {
+                  const icebreaker = "Hey! Let's talk! 👋";
+                  const optimisticKey = `opt-${Date.now()}`;
+                  const optimisticEntry = {
+                    username,
+                    text: icebreaker,
+                    timestamp: BigInt(Date.now() * 1_000_000),
+                    key: optimisticKey,
+                  };
+                  setOptimisticMessages((prev) => [...prev, optimisticEntry]);
+                  try {
+                    await sendMutation.mutateAsync({
+                      username,
+                      text: icebreaker,
+                    });
+                    setOptimisticMessages((prev) =>
+                      prev.filter((m) => m.key !== optimisticKey),
+                    );
+                  } catch {
+                    setOptimisticMessages((prev) =>
+                      prev.filter((m) => m.key !== optimisticKey),
+                    );
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
+                style={{
+                  background: "oklch(0.45 0.2 165 / 0.18)",
+                  border: "1px solid oklch(0.55 0.2 165 / 0.5)",
+                  color: "oklch(0.78 0.22 165)",
+                }}
+              >
+                💬 Talk
+              </button>
+            )}
             {isStranger && onSkip && (
               <button
                 type="button"

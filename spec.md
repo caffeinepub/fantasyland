@@ -1,26 +1,29 @@
 # FantasyLand
 
 ## Current State
-Game Zone has 6 games with Accept/Deny challenge cards. Users have auto-generated UIDs. Social Media room supports posts with likes. No leaderboard exists. User avatars use colored initials only.
+- 1v1 chat has a Skip button in the header when `isStranger && onSkip`
+- Social Media room has a composer (textarea + photo/video/camera buttons + Publish) but the bottom row overflows on small screens
+- Game Zone has 6 games (RPS, TTT, Number Guess, Word Scramble, Trivia, 1v1 Duel) but no Play with Strangers / Play with AI mode selector
+- TrendingPopup fires at 10 likes (trending) and 20 likes (viral) — far too low
 
 ## Requested Changes (Diff)
 
 ### Add
-- Game Zone leaderboard panel showing top players by score/wins across all games
-- Cute animated avatar logos for every user (guest and permanent) — small animated icon/emoji characters that appear next to usernames in chat, members list, and profile
-- New Record popup: when a user beats their high score in any Game Zone game, show a celebratory animated popup (confetti, trophy icon, "New Record!" banner)
-- Trending popup: when a Social Media post reaches a high like count (e.g. 10+ likes) or when a post becomes viral, show an animated "Trending Now 🔥" popup/toast notification to the room
+- **Talk button** in 1v1 chat header (next to Skip): sends a friendly icebreaker message "Hey! Let's talk! 👋" into the chat
+- **Game Zone mode selector**: at the top of GameRoom, two cards — "Play with Strangers" (matchmaking, find a live opponent, show waiting/matched state) and "Play with AI" (existing solo games). Default shows the selector; choosing a mode enters that sub-experience.
+- Views counter on Social Media posts (increments when a post is expanded/read)
 
 ### Modify
-- User avatar system: replace plain colored initials with cute animated SVG/emoji-based avatar icons (e.g. animals, fantasy creatures) — assigned randomly and consistently per user based on their UID
-- Game Zone UI: add a leaderboard tab/section showing top 10 players with their animated avatars, usernames, and scores
+- **Trending popup thresholds**: change from 10/20 likes to 1000 likes (trending) and 10000 views (viral). In demo/dev mode, simulate with a debug multiplier so it fires at 10 likes / 100 views to test UI.
+- **Social Media composer layout**: make the action buttons row (`flex-wrap`) so Photo/Video/Camera and Publish button don't overflow on small screens. Publish button should always be visible. Add `min-w-0` and proper responsive padding.
 
 ### Remove
 - Nothing removed
 
 ## Implementation Plan
-1. Create an `AVATARS` array of 20+ cute animated SVG/CSS-animated avatar icons (animals, stars, fantasy characters) assigned to users by hashing their UID
-2. Replace all avatar circles (colored initials) throughout the app with these animated avatars
-3. Add a leaderboard state tracked in localStorage (per game scores/wins) and display a top-10 leaderboard panel in the Game Zone room
-4. Add a `NewRecordPopup` component: confetti burst + trophy + "New Record!" text, triggered when a game score exceeds previous best
-5. Add a `TrendingPopup` component: fire animation + "Trending Now" banner, triggered when a post's like count crosses a threshold (10 likes) or goes viral
+1. In `ChatRoom.tsx`: add a "💬 Talk" button next to Skip (only when `isStranger`) that sends an icebreaker message
+2. In `SocialMediaRoom.tsx`: 
+   - Wrap composer bottom row in `flex-wrap gap-2` with Publish always on its own if needed
+   - Add `views` field to Post type, increment on post render/expand
+   - Change trending threshold to 1000 likes (trending) and 10000 views (viral); keep a `DEV_MODE` multiplier (1000x) so it still fires easily in demo
+3. In `GameRoom.tsx`: add a `gamePlayMode` state (`null | 'ai' | 'stranger'`). When null, show a mode selector screen with two big cards. 'ai' = existing game UI. 'stranger' = matchmaking UI (waiting for opponent, then plays same games with simulated opponent turns)
