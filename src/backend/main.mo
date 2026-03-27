@@ -87,6 +87,8 @@ actor {
   let rpsGames = Map.empty<Text, RPSGame>();
   let gameChallenges = Map.empty<Text, GameChallenge>();
   let friendRequests = Map.empty<Text, FriendRequest>();
+  let gameQueue = Map.empty<Text, Int>();
+  let gameMatchResults = Map.empty<Text, Text>();
   var idCounter : Nat = 0;
 
   // ─── Init ─────────────────────────────────────────────────────────────────
@@ -485,4 +487,45 @@ actor {
       };
     };
   };
+
+  // ─── Game Zone Matchmaking ────────────────────────────────────────────────
+
+  public shared ({ caller }) func joinGameQueue(username : Text) : async ?{ matchId : Text; opponent : Text } {
+    // Check if already matched
+    switch (gameMatchResults.get(username)) {
+      case (?opponent) {
+        gameMatchResults.remove(username);
+        let matchId = "game-" # username # "-" # opponent;
+        return ?{ matchId; opponent };
+      };
+      case (null) {};
+    };
+    // Try to match with someone in queue
+    for ((waitingUser, _) in gameQueue.entries()) {
+      if (waitingUser != username) {
+        gameQueue.remove(waitingUser);
+        gameMatchResults.add(waitingUser, username);
+        let matchId = "game-" # waitingUser # "-" # username;
+        return ?{ matchId; opponent = waitingUser };
+      };
+    };
+    gameQueue.add(username, Time.now());
+    null;
+  };
+
+  public shared ({ caller }) func leaveGameQueue(username : Text) : async () {
+    gameQueue.remove(username);
+    gameMatchResults.remove(username);
+  };
+
+  public query ({ caller }) func getGameQueueMatch(username : Text) : async ?{ matchId : Text; opponent : Text } {
+    switch (gameMatchResults.get(username)) {
+      case (?opponent) {
+        let matchId = "game-" # username # "-" # opponent;
+        ?{ matchId; opponent };
+      };
+      case (null) { null };
+    };
+  };
+
 };

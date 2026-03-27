@@ -111,6 +111,41 @@ export function useGetMatchResult(username: string, enabled: boolean) {
   });
 }
 
+export function useJoinGameQueue() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async (username: string) => {
+      if (!actor) throw new Error("No actor");
+      const result = await (actor as any).joinGameQueue(username);
+      return result as { matchId: string; opponent: string } | null;
+    },
+  });
+}
+
+export function useLeaveGameQueue() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async (username: string) => {
+      if (!actor) throw new Error("No actor");
+      return (actor as any).leaveGameQueue(username) as Promise<void>;
+    },
+  });
+}
+
+export function useGetGameQueueMatch(username: string, enabled: boolean) {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["gameQueueMatch", username],
+    queryFn: async () => {
+      if (!actor) return null;
+      const result = await (actor as any).getGameQueueMatch(username);
+      return result as { matchId: string; opponent: string } | null;
+    },
+    enabled: !!actor && !isFetching && enabled,
+    refetchInterval: enabled ? 1500 : false,
+  });
+}
+
 export function useCreateRPSChallenge() {
   const { actor } = useActor();
   return useMutation({

@@ -66,6 +66,10 @@ export interface _SERVICE {
   >,
   'updatePresence' : ActorMethod<[string, string], undefined>,
   'validateSession' : ActorMethod<[string], [] | [string]>,
+  'getGameQueueMatch' : ActorMethod<[string], [] | [{ 'matchId' : string, 'opponent' : string }]>,
+  'joinGameQueue' : ActorMethod<[string], [] | [{ 'matchId' : string, 'opponent' : string }]>,
+  'leaveGameQueue' : ActorMethod<[string], undefined>,
+
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

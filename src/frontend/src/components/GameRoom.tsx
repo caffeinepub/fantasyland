@@ -10,6 +10,9 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  useGetGameQueueMatch,
+  useJoinGameQueue,
+  useLeaveGameQueue,
   usePendingChallenges,
   useRespondToChallenge,
 } from "../hooks/useQueries";
@@ -623,18 +626,6 @@ function TriviaQuiz({
 }
 
 // ─── 1v1 Duel ─────────────────────────────────────────────────────────────────
-const OPPONENT_NAMES = [
-  "Phantom",
-  "Ghost",
-  "Neon",
-  "Shadow",
-  "Viper",
-  "Blaze",
-  "Storm",
-  "Cipher",
-  "Nova",
-  "Wraith",
-];
 
 const RPS_CHOICES = ["✊ Rock", "✋ Paper", "✌️ Scissors"] as const;
 const RPS_VALUES = ["Rock", "Paper", "Scissors"] as const;
@@ -1214,6 +1205,11 @@ export default function GameRoom({ username, onRename, onBack }: Props) {
     "searching" | "matched" | "playing"
   >("searching");
   const [opponentName, setOpponentName] = useState("");
+  const [_matchId, setMatchId] = useState("");
+  const joinGameQueueMutation = useJoinGameQueue();
+  const leaveGameQueueMutation = useLeaveGameQueue();
+  const isSearching = gamePlayMode === "stranger" && matchPhase === "searching";
+  const { data: gameQueueMatch } = useGetGameQueueMatch(username, isSearching);
   const uid = (() => {
     try {
       return localStorage.getItem("fantasyUID") || username;
@@ -1227,6 +1223,19 @@ export default function GameRoom({ username, onRename, onBack }: Props) {
   const visibleChallenges = pendingChallenges.filter(
     (c) => c.challenger !== username && c.status === "pending",
   );
+
+  // Real stranger matchmaking effect
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
+  useEffect(() => {
+    if (gameQueueMatch) {
+      const { matchId: mid, opponent } = gameQueueMatch;
+      setOpponentName(opponent);
+      setMatchId(mid);
+      setMatchPhase("matched");
+      leaveGameQueueMutation.mutate(username);
+      setTimeout(() => setMatchPhase("playing"), 1800);
+    }
+  }, [gameQueueMatch]);
 
   const handleAcceptChallenge = async (id: string, gameName: string) => {
     try {
@@ -1331,19 +1340,21 @@ export default function GameRoom({ username, onRename, onBack }: Props) {
             <button
               type="button"
               data-ocid="gamezone.mode.stranger.button"
-              onClick={() => {
+              onClick={async () => {
                 setGamePlayMode("stranger");
                 setMatchPhase("searching");
-                const delay = 2000 + Math.random() * 2000;
-                const name =
-                  OPPONENT_NAMES[
-                    Math.floor(Math.random() * OPPONENT_NAMES.length)
-                  ];
-                setTimeout(() => {
-                  setOpponentName(name);
-                  setMatchPhase("matched");
-                  setTimeout(() => setMatchPhase("playing"), 1500);
-                }, delay);
+                try {
+                  const result =
+                    await joinGameQueueMutation.mutateAsync(username);
+                  if (result) {
+                    setOpponentName(result.opponent);
+                    setMatchId(result.matchId);
+                    setMatchPhase("matched");
+                    setTimeout(() => setMatchPhase("playing"), 1800);
+                  }
+                } catch {
+                  // Will be picked up by polling
+                }
               }}
               className="group flex flex-col items-center gap-4 p-7 rounded-3xl transition-all duration-200 hover:scale-105"
               style={{
@@ -1397,7 +1408,10 @@ export default function GameRoom({ username, onRename, onBack }: Props) {
           <button
             type="button"
             data-ocid="gamezone.matchmaking.cancel.button"
-            onClick={() => setGamePlayMode(null)}
+            onClick={() => {
+              leaveGameQueueMutation.mutate(username);
+              setGamePlayMode(null);
+            }}
             className="px-5 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105"
             style={{
               background: "oklch(0.55 0.25 25 / 0.15)",

@@ -83,6 +83,9 @@ export const idlService = IDL.Service({
     ),
   'updatePresence' : IDL.Func([IDL.Text, IDL.Text], [], []),
   'validateSession' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
+  'getGameQueueMatch' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Record({'matchId': IDL.Text, 'opponent': IDL.Text}))], ['query']),
+  'joinGameQueue' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Record({'matchId': IDL.Text, 'opponent': IDL.Text}))], []),
+  'leaveGameQueue' : IDL.Func([IDL.Text], [], []),
 });
 
 export const idlInitArgs = [];
