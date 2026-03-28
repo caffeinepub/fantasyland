@@ -1,34 +1,32 @@
 # FantasyLand
 
 ## Current State
-Game Zone has a "Play with Strangers" mode that fakes opponent matching using a random name from a hardcoded list after a short delay. No real-time multiplayer game state exists for Game Zone.
+Game Zone has stranger matchmaking that pairs two players, but after matching, the game is played locally (fake AI opponent). No real move syncing happens between matched strangers.
 
-The backend already has:
-- `joinMatchmaking / leaveMatchmaking / getMatchResult` for 1v1 chat
-- `createRPSChallenge / joinRPSGame / playRPS / getRPSGame` for RPS multiplayer
-- `joinGameQueue` does not exist yet
+Backend has RPS game support (`createRPSChallenge`, `joinRPSGame`, `playRPS`, `getRPSGame`) for chat rooms. Game Zone queue uses `joinGameQueue`/`getGameQueueMatch`/`leaveGameQueue`.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Backend: `joinGameQueue(username)` — joins game matchmaking queue, returns `?{matchId: Text; opponent: Text}` if matched immediately
-- Backend: `leaveGameQueue(username)` — removes from queue
-- Backend: `getGameQueueMatch(username)` — poll for match result, returns `?{matchId: Text; opponent: Text}`
-- Frontend: Replace fake opponent timeout in GameRoom with real backend polling via `joinGameQueue` + `getGameQueueMatch`
-- When matched, automatically start an RPS game between the two players using existing `createRPSChallenge / joinRPSGame / playRPS / getRPSGame`
-- Show opponent's real username in matched banner
+- Backend `GameSession` type with RPS and TTT support (player1/player2, moves, result, status)
+- Backend functions: `createGameSession`, `joinGameSession`, `submitRPSMove`, `submitTTTMove`, `getGameSession`
+- New `StrangerGame.tsx` frontend component for synced RPS/TTT between matched strangers
+- Hooks for all new backend functions
 
 ### Modify
-- GameRoom.tsx: Replace fake `setTimeout` matching with real backend matchmaking loop (poll every 1.5s)
-- GameRoom.tsx: After match, create and sync RPS game between two real users
+- GameRoom.tsx: after stranger match, show `StrangerGame` instead of local `DuelGame`
+- backend.did.d.ts: add GameSessionView type and new method signatures
 
 ### Remove
-- `OPPONENT_NAMES` fake name array usage in stranger mode
+- Nothing removed
 
 ## Implementation Plan
-1. Add `gameQueue` and `gameMatchResults` HashMaps to backend
-2. Add `joinGameQueue`, `leaveGameQueue`, `getGameQueueMatch` funcs to backend
-3. Update `backend.d.ts` bindings
-4. In GameRoom.tsx, replace fake timeout with polling loop calling `joinGameQueue` then `getGameQueueMatch`
-5. On match, use `createRPSChallenge` / `joinRPSGame` so both users play real RPS together
-6. Show opponent's real username in matched banner
+1. Add GameSession backend (Motoko) with RPS + TTT logic
+2. Update declarations file
+3. Add 5 new hooks to useQueries.ts
+4. Create StrangerGame.tsx component that:
+   - Determines player1 vs player2 from matchId
+   - Player1 sees game picker (RPS or TTT), creates session on pick
+   - Player2 polls for session and auto-joins when session appears
+   - Both poll getGameSession and render live game state
+5. Wire StrangerGame into GameRoom when matchPhase === 'playing'

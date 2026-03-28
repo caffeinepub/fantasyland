@@ -21,6 +21,18 @@ export interface GameChallengeView {
 export type GameStatus = { 'pending' : null } |
   { 'denied' : null } |
   { 'accepted' : null };
+export interface GameSessionView {
+  'id' : string,
+  'gameType' : string,
+  'player1' : string,
+  'player2' : [] | [string],
+  'status' : string,
+  'rpsMove1' : [] | [string],
+  'rpsMove2' : [] | [string],
+  'tttCells' : Array<[] | [string]>,
+  'tttTurn' : bigint,
+  'result' : [] | [string],
+}
 export interface Message {
   'username' : string,
   'text' : string,
@@ -69,6 +81,11 @@ export interface _SERVICE {
   'getGameQueueMatch' : ActorMethod<[string], [] | [{ 'matchId' : string, 'opponent' : string }]>,
   'joinGameQueue' : ActorMethod<[string], [] | [{ 'matchId' : string, 'opponent' : string }]>,
   'leaveGameQueue' : ActorMethod<[string], undefined>,
+  'createGameSession' : ActorMethod<[string, string, string], boolean>,
+  'joinGameSession' : ActorMethod<[string, string], boolean>,
+  'submitRPSMove' : ActorMethod<[string, string, string], undefined>,
+  'submitTTTMove' : ActorMethod<[string, string, bigint], boolean>,
+  'getGameSession' : ActorMethod<[string], [] | [GameSessionView]>,
 
 }
 export declare const idlService: IDL.ServiceClass;

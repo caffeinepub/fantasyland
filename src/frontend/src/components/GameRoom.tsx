@@ -21,6 +21,7 @@ import AnimatedAvatar from "./AnimatedAvatar";
 import NewRecordPopup from "./NewRecordPopup";
 import NumberGuess from "./NumberGuess";
 import RPSGame from "./RPSGame";
+import StrangerGame from "./StrangerGame";
 import TicTacToe from "./TicTacToe";
 import UsernameTopBar from "./UsernameTopBar";
 
@@ -1233,7 +1234,10 @@ export default function GameRoom({ username, onRename, onBack }: Props) {
       setMatchId(mid);
       setMatchPhase("matched");
       leaveGameQueueMutation.mutate(username);
-      setTimeout(() => setMatchPhase("playing"), 1800);
+      setTimeout(() => {
+        setMatchPhase("playing");
+        setActiveTab("duel");
+      }, 1800);
     }
   }, [gameQueueMatch]);
 
@@ -1350,7 +1354,10 @@ export default function GameRoom({ username, onRename, onBack }: Props) {
                     setOpponentName(result.opponent);
                     setMatchId(result.matchId);
                     setMatchPhase("matched");
-                    setTimeout(() => setMatchPhase("playing"), 1800);
+                    setTimeout(() => {
+                      setMatchPhase("playing");
+                      setActiveTab("duel");
+                    }, 1800);
                   }
                 } catch {
                   // Will be picked up by polling
@@ -1709,7 +1716,20 @@ export default function GameRoom({ username, onRename, onBack }: Props) {
           {activeTab === "trivia" && (
             <TriviaQuiz username={username} uid={uid} />
           )}
-          {activeTab === "duel" && <DuelGame />}
+          {activeTab === "duel" &&
+            (gamePlayMode === "stranger" && matchPhase === "playing" ? (
+              <StrangerGame
+                username={username}
+                opponentName={opponentName}
+                matchId={_matchId}
+                onLeave={() => {
+                  setGamePlayMode(null);
+                  setMatchPhase("searching");
+                }}
+              />
+            ) : (
+              <DuelGame />
+            ))}
         </div>
       </div>
       {/* Leaderboard Modal */}

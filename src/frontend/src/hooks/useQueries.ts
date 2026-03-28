@@ -415,3 +415,102 @@ export function useFriendRequestStatus(fromUser: string, toUser: string) {
     refetchInterval: 8000,
   });
 }
+
+// ─── Game Session Hooks ───────────────────────────────────────────────────────
+
+export function useCreateGameSession() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      player1,
+      gameType,
+    }: { sessionId: string; player1: string; gameType: string }) => {
+      if (!actor) throw new Error("No actor");
+      return (actor as any).createGameSession(
+        sessionId,
+        player1,
+        gameType,
+      ) as Promise<boolean>;
+    },
+  });
+}
+
+export function useJoinGameSession() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      player2,
+    }: { sessionId: string; player2: string }) => {
+      if (!actor) throw new Error("No actor");
+      return (actor as any).joinGameSession(
+        sessionId,
+        player2,
+      ) as Promise<boolean>;
+    },
+  });
+}
+
+export function useSubmitRPSMove() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      username,
+      move,
+    }: { sessionId: string; username: string; move: string }) => {
+      if (!actor) throw new Error("No actor");
+      return (actor as any).submitRPSMove(
+        sessionId,
+        username,
+        move,
+      ) as Promise<void>;
+    },
+  });
+}
+
+export function useSubmitTTTMove() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      username,
+      cellIndex,
+    }: { sessionId: string; username: string; cellIndex: number }) => {
+      if (!actor) throw new Error("No actor");
+      return (actor as any).submitTTTMove(
+        sessionId,
+        username,
+        BigInt(cellIndex),
+      ) as Promise<boolean>;
+    },
+  });
+}
+
+export function useGetGameSession(sessionId: string | null, enabled: boolean) {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["gameSession", sessionId],
+    queryFn: async () => {
+      if (!actor || !sessionId) return null;
+      const result = await (actor as any).getGameSession(sessionId);
+      if (!result) return null;
+      return result as {
+        id: string;
+        gameType: string;
+        player1: string;
+        player2: string | null;
+        status: string;
+        rpsMove1: string | null;
+        rpsMove2: string | null;
+        tttCells: (string | null)[];
+        tttTurn: bigint;
+        result: string | null;
+      };
+    },
+    enabled: !!actor && !isFetching && !!sessionId && enabled,
+    refetchInterval: enabled ? 1200 : false,
+    staleTime: 0,
+  });
+}

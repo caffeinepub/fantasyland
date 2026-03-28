@@ -528,4 +528,198 @@ actor {
     };
   };
 
+  // ─── Game Sessions (Real-time synced RPS/TTT for matched strangers) ─────────
+
+  type GameSession = {
+    id : Text;
+    gameType : Text;
+    player1 : Text;
+    var player2 : ?Text;
+    var status : Text;
+    var rpsMove1 : ?Text;
+    var rpsMove2 : ?Text;
+    var t0 : ?Text; var t1 : ?Text; var t2 : ?Text;
+    var t3 : ?Text; var t4 : ?Text; var t5 : ?Text;
+    var t6 : ?Text; var t7 : ?Text; var t8 : ?Text;
+    var tttTurn : Nat;
+    var result : ?Text;
+  };
+
+  type GameSessionView = {
+    id : Text;
+    gameType : Text;
+    player1 : Text;
+    player2 : ?Text;
+    status : Text;
+    rpsMove1 : ?Text;
+    rpsMove2 : ?Text;
+    tttCells : [?Text];
+    tttTurn : Nat;
+    result : ?Text;
+  };
+
+  let gameSessions = Map.empty<Text, GameSession>();
+
+  func makeGameSessionView(g : GameSession) : GameSessionView {
+    {
+      id = g.id;
+      gameType = g.gameType;
+      player1 = g.player1;
+      player2 = g.player2;
+      status = g.status;
+      rpsMove1 = g.rpsMove1;
+      rpsMove2 = g.rpsMove2;
+      tttCells = [g.t0, g.t1, g.t2, g.t3, g.t4, g.t5, g.t6, g.t7, g.t8];
+      tttTurn = g.tttTurn;
+      result = g.result;
+    };
+  };
+
+  func getTTTCell(g : GameSession, idx : Nat) : ?Text {
+    switch idx {
+      case 0 { g.t0 }; case 1 { g.t1 }; case 2 { g.t2 };
+      case 3 { g.t3 }; case 4 { g.t4 }; case 5 { g.t5 };
+      case 6 { g.t6 }; case 7 { g.t7 }; case 8 { g.t8 };
+      case _ { null };
+    };
+  };
+
+  func setTTTCell(g : GameSession, idx : Nat, mark : Text) {
+    switch idx {
+      case 0 { g.t0 := ?mark }; case 1 { g.t1 := ?mark }; case 2 { g.t2 := ?mark };
+      case 3 { g.t3 := ?mark }; case 4 { g.t4 := ?mark }; case 5 { g.t5 := ?mark };
+      case 6 { g.t6 := ?mark }; case 7 { g.t7 := ?mark }; case 8 { g.t8 := ?mark };
+      case _ {};
+    };
+  };
+
+  func lineWins(g : GameSession, a : Nat, b : Nat, c : Nat) : Bool {
+    let ca = getTTTCell(g, a);
+    let cb = getTTTCell(g, b);
+    let cc = getTTTCell(g, c);
+    switch (ca, cb, cc) {
+      case (?x, ?y, ?z) { x == y and y == z };
+      case (_) { false };
+    };
+  };
+
+  func tttWinner(g : GameSession) : ?Text {
+    let lines : [(Nat, Nat, Nat)] = [
+      (0,1,2),(3,4,5),(6,7,8),
+      (0,3,6),(1,4,7),(2,5,8),
+      (0,4,8),(2,4,6)
+    ];
+    for ((a, b, c) in lines.vals()) {
+      if (lineWins(g, a, b, c)) { return getTTTCell(g, a) };
+    };
+    null
+  };
+
+  func isTTTFull(g : GameSession) : Bool {
+    g.t0 != null and g.t1 != null and g.t2 != null and
+    g.t3 != null and g.t4 != null and g.t5 != null and
+    g.t6 != null and g.t7 != null and g.t8 != null
+  };
+
+  public shared func createGameSession(sessionId : Text, player1 : Text, gameType : Text) : async Bool {
+    if (gameSessions.containsKey(sessionId)) { return false };
+    let g : GameSession = {
+      id = sessionId;
+      gameType;
+      player1;
+      var player2 = null;
+      var status = "waiting";
+      var rpsMove1 = null;
+      var rpsMove2 = null;
+      var t0 = null; var t1 = null; var t2 = null;
+      var t3 = null; var t4 = null; var t5 = null;
+      var t6 = null; var t7 = null; var t8 = null;
+      var tttTurn = 0;
+      var result = null;
+    };
+    gameSessions.add(sessionId, g);
+    true
+  };
+
+  public shared func joinGameSession(sessionId : Text, player2 : Text) : async Bool {
+    switch (gameSessions.get(sessionId)) {
+      case (null) { false };
+      case (?g) {
+        if (g.status == "waiting" and g.player1 != player2) {
+          g.player2 := ?player2;
+          g.status := "playing";
+          true
+        } else { false };
+      };
+    };
+  };
+
+  public shared func submitRPSMove(sessionId : Text, username : Text, move : Text) : async () {
+    switch (gameSessions.get(sessionId)) {
+      case (null) {};
+      case (?g) {
+        if (g.status != "playing") { return };
+        if (username == g.player1 and g.rpsMove1 == null) {
+          g.rpsMove1 := ?move;
+        } else if (?(username) == g.player2 and g.rpsMove2 == null) {
+          g.rpsMove2 := ?move;
+        };
+        switch (g.rpsMove1, g.rpsMove2) {
+          case (?m1, ?m2) {
+            let res = if (m1 == m2) { "draw" } else {
+              if (
+                (m1 == "rock" and m2 == "scissors") or
+                (m1 == "scissors" and m2 == "paper") or
+                (m1 == "paper" and m2 == "rock")
+              ) { "player1wins" } else { "player2wins" };
+            };
+            g.result := ?res;
+            g.status := "done";
+          };
+          case (_) {};
+        };
+      };
+    };
+  };
+
+  public shared func submitTTTMove(sessionId : Text, username : Text, cellIndex : Nat) : async Bool {
+    switch (gameSessions.get(sessionId)) {
+      case (null) { false };
+      case (?g) {
+        if (g.status != "playing") { return false };
+        let isP1 = username == g.player1;
+        let isP2 = ?(username) == g.player2;
+        if (not isP1 and not isP2) { return false };
+        let myTurn = (isP1 and g.tttTurn == 0) or (isP2 and g.tttTurn == 1);
+        if (not myTurn) { return false };
+        if (getTTTCell(g, cellIndex) != null) { return false };
+        let mark = if (isP1) { "X" } else { "O" };
+        setTTTCell(g, cellIndex, mark);
+        switch (tttWinner(g)) {
+          case (?w) {
+            g.result := ?w;
+            g.status := "done";
+          };
+          case (null) {
+            if (isTTTFull(g)) {
+              g.result := ?"draw";
+              g.status := "done";
+            } else {
+              g.tttTurn := if (g.tttTurn == 0) { 1 } else { 0 };
+            };
+          };
+        };
+        true
+      };
+    };
+  };
+
+  public query func getGameSession(sessionId : Text) : async ?GameSessionView {
+    switch (gameSessions.get(sessionId)) {
+      case (null) { null };
+      case (?g) { ?makeGameSessionView(g) };
+    };
+  };
+
+
 };
