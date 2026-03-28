@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Lock, LogIn, Plus, X } from "lucide-react";
+import { Loader2, Lock, LogIn, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useCreatePrivateRoom, useRoomExists } from "../hooks/useQueries";
@@ -25,10 +25,19 @@ export default function PrivateRoomModal({ onClose, onEnter }: Props) {
       return;
     }
     try {
-      await createRoom.mutateAsync(trimmed);
+      const result = await createRoom.mutateAsync(trimmed);
+      // result === false means room already exists — join it anyway
+      if (result === false) {
+        toast("Room already exists — joining it!");
+      }
       onEnter(trimmed);
-    } catch {
-      toast.error("Failed to create room");
+    } catch (err: any) {
+      const msg = String(err?.message ?? err ?? "");
+      if (msg.includes("No actor") || msg.includes("connect")) {
+        toast.error("Still connecting — please try again in a moment");
+      } else {
+        toast.error("Failed to create room");
+      }
     }
   };
 
@@ -42,8 +51,13 @@ export default function PrivateRoomModal({ onClose, onEnter }: Props) {
       const exists = await checkRoom.mutateAsync(trimmed);
       if (exists) onEnter(trimmed);
       else toast.error("Room not found. Check the code and try again.");
-    } catch {
-      toast.error("Failed to find room");
+    } catch (err: any) {
+      const msg = String(err?.message ?? err ?? "");
+      if (msg.includes("No actor") || msg.includes("connect")) {
+        toast.error("Still connecting — please try again in a moment");
+      } else {
+        toast.error("Failed to find room");
+      }
     }
   };
 
@@ -156,7 +170,7 @@ export default function PrivateRoomModal({ onClose, onEnter }: Props) {
           }
           onClick={tab === "create" ? handleCreate : handleJoin}
           disabled={loading || code.trim().length !== 6}
-          className="w-full rounded-xl py-2.5 font-semibold transition-all duration-200"
+          className="w-full rounded-xl py-2.5 font-semibold transition-all duration-200 flex items-center justify-center gap-2"
           style={{
             background:
               "linear-gradient(135deg, oklch(0.65 0.28 305), oklch(0.6 0.25 250))",
@@ -166,13 +180,17 @@ export default function PrivateRoomModal({ onClose, onEnter }: Props) {
             opacity: loading || code.trim().length !== 6 ? 0.5 : 1,
           }}
         >
-          {tab === "create" ? (
-            <Plus size={16} className="inline mr-2" />
+          {loading ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : tab === "create" ? (
+            <Plus size={16} />
           ) : (
-            <LogIn size={16} className="inline mr-2" />
+            <LogIn size={16} />
           )}
           {loading
-            ? "Loading..."
+            ? tab === "create"
+              ? "Creating..."
+              : "Joining..."
             : tab === "create"
               ? "Create Room"
               : "Join Room"}

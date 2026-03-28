@@ -10,7 +10,7 @@ export function useMessages(roomId: string) {
       return actor.getMessages(roomId);
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: 600,
+    refetchInterval: roomId === "world" ? 300 : 600,
     staleTime: 0,
     gcTime: 0,
   });

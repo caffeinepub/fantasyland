@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useGameSounds } from "../hooks/useGameSounds";
 import {
   useGetGameQueueMatch,
   useJoinGameQueue,
@@ -42,6 +43,192 @@ const TABS: { id: GameTab; label: string; emoji: string }[] = [
   { id: "duel", label: "1v1 Duel", emoji: "⚔️" },
 ];
 
+type RoundPhase = "select" | "playing" | "round_result" | "series_over";
+
+// ─── Shared Round Components ──────────────────────────────────────────────────
+function RoundSelector({
+  onSelect,
+  accentColor = "oklch(0.65 0.22 50)",
+  accentBorder = "oklch(0.65 0.22 50 / 0.5)",
+}: {
+  onSelect: (n: 3 | 5) => void;
+  accentColor?: string;
+  accentBorder?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-5 w-full">
+      <p
+        className="text-sm font-bold"
+        style={{ color: "oklch(0.65 0.06 280)" }}
+      >
+        Choose Series Length
+      </p>
+      <div className="grid grid-cols-2 gap-3 w-full">
+        {([3, 5] as const).map((n) => (
+          <button
+            key={n}
+            type="button"
+            data-ocid={`round.bo${n}.button`}
+            onClick={() => onSelect(n)}
+            className="py-5 rounded-2xl font-black text-lg transition-all hover:scale-105"
+            style={{
+              background: `${accentColor.replace(")", " / 0.15)").replace("oklch(", "oklch(")}`,
+              border: `2px solid ${accentBorder}`,
+              color: accentColor,
+              boxShadow: `0 0 16px ${accentColor.replace(")", " / 0.15)").replace("oklch(", "oklch(")}`,
+            }}
+          >
+            Best of {n}
+            <div className="text-xs font-medium mt-1 opacity-60">
+              First to {Math.ceil(n / 2)} wins
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RoundFlash({
+  result,
+  playerWins,
+  opponentWins,
+}: {
+  result: "win" | "lose" | "draw" | null;
+  playerWins: number;
+  opponentWins: number;
+}) {
+  return (
+    <div
+      className="absolute inset-0 z-30 flex flex-col items-center justify-center rounded-2xl"
+      style={{
+        background:
+          result === "win"
+            ? "oklch(0.4 0.18 145 / 0.9)"
+            : result === "lose"
+              ? "oklch(0.35 0.2 20 / 0.9)"
+              : "oklch(0.25 0.08 280 / 0.9)",
+        animation: "fadeInOut 1.4s ease forwards",
+      }}
+    >
+      <style>{`
+        @keyframes bounceIn { 0% { transform: scale(0.4) rotate(-20deg); } 60% { transform: scale(1.25) rotate(5deg); } 100% { transform: scale(1.1) rotate(0deg); } }
+        @keyframes fadeInOut { 0% { opacity: 0; } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+      `}</style>
+      <div
+        style={{ fontSize: "5rem", animation: "bounceIn 0.5s ease forwards" }}
+      >
+        {result === "win" ? "🎉" : result === "lose" ? "💀" : "🤝"}
+      </div>
+      <p
+        className="text-2xl font-black mt-2"
+        style={{
+          color:
+            result === "win"
+              ? "oklch(0.9 0.2 145)"
+              : result === "lose"
+                ? "oklch(0.85 0.18 20)"
+                : "oklch(0.88 0.04 280)",
+        }}
+      >
+        {result === "win"
+          ? "Round Win!"
+          : result === "lose"
+            ? "Round Loss!"
+            : "Draw!"}
+      </p>
+      <p className="text-base font-bold mt-1" style={{ color: "white" }}>
+        You {playerWins} — {opponentWins} AI
+      </p>
+    </div>
+  );
+}
+
+function SeriesOver({
+  playerWins,
+  opponentWins,
+  totalRounds,
+  currentRound,
+  onPlayAgain,
+}: {
+  playerWins: number;
+  opponentWins: number;
+  totalRounds: 3 | 5;
+  currentRound: number;
+  onPlayAgain: () => void;
+}) {
+  const won = playerWins > opponentWins;
+  const tied = playerWins === opponentWins;
+  return (
+    <div className="w-full flex flex-col items-center gap-4 py-4 text-center">
+      <div className="text-6xl">{won ? "🏆" : tied ? "🤝" : "💀"}</div>
+      <h3
+        className="text-2xl font-black"
+        style={{
+          color: won
+            ? "oklch(0.82 0.22 55)"
+            : tied
+              ? "oklch(0.75 0.06 280)"
+              : "oklch(0.72 0.22 20)",
+        }}
+      >
+        {won
+          ? "You Win the Series!"
+          : tied
+            ? "It's a Tie!"
+            : "You Lost the Series!"}
+      </h3>
+      <div
+        className="flex items-center gap-4 px-6 py-3 rounded-2xl"
+        style={{ background: "oklch(0.09 0.03 280)" }}
+      >
+        <div className="text-center">
+          <div
+            className="text-3xl font-black"
+            style={{ color: "oklch(0.82 0.22 55)" }}
+          >
+            {playerWins}
+          </div>
+          <div className="text-xs" style={{ color: "oklch(0.55 0.06 280)" }}>
+            You
+          </div>
+        </div>
+        <div style={{ color: "oklch(0.4 0.06 280)" }} className="text-xl">
+          —
+        </div>
+        <div className="text-center">
+          <div
+            className="text-3xl font-black"
+            style={{ color: "oklch(0.72 0.22 300)" }}
+          >
+            {opponentWins}
+          </div>
+          <div className="text-xs" style={{ color: "oklch(0.55 0.06 280)" }}>
+            AI
+          </div>
+        </div>
+      </div>
+      <p className="text-sm" style={{ color: "oklch(0.5 0.06 280)" }}>
+        Best of {totalRounds} · {currentRound} rounds played
+      </p>
+      <button
+        type="button"
+        data-ocid="series.play_again.button"
+        onClick={onPlayAgain}
+        className="px-8 py-3 rounded-xl font-bold transition-all hover:scale-105"
+        style={{
+          background:
+            "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
+          color: "white",
+          boxShadow: "0 0 20px oklch(0.65 0.22 50 / 0.4)",
+        }}
+      >
+        Play Again
+      </button>
+    </div>
+  );
+}
+
 // ─── Word Scramble ────────────────────────────────────────────────────────────
 const WORDS = [
   "GALAXY",
@@ -72,7 +259,6 @@ function scramble(word: string): string {
     const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-  // Make sure it's actually scrambled
   if (arr.join("") === word && word.length > 1) return scramble(word);
   return arr.join("");
 }
@@ -81,6 +267,19 @@ function WordScramble({
   username = "Guest",
   uid = "",
 }: { username?: string; uid?: string }) {
+  const { playCorrect, playWrong, playWin, playLose, playTick } =
+    useGameSounds();
+  // Round system
+  const [roundPhase, setRoundPhase] = useState<RoundPhase>("select");
+  const [totalRounds, setTotalRounds] = useState<3 | 5>(3);
+  const [currentRound, setCurrentRound] = useState(1);
+  const [playerWins, setPlayerWins] = useState(0);
+  const [opponentWins, setOpponentWins] = useState(0);
+  const [lastResult, setLastResult] = useState<"win" | "lose" | "draw" | null>(
+    null,
+  );
+
+  // Game state
   const [wordIndex, setWordIndex] = useState(() =>
     Math.floor(Math.random() * WORDS.length),
   );
@@ -93,15 +292,28 @@ function WordScramble({
   const [gameOver, setGameOver] = useState(false);
   const [wsNewRecord, setWsNewRecord] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   const currentWord = WORDS[wordIndex];
+  const winsNeeded = Math.ceil(totalRounds / 2);
 
   useEffect(() => {
     setScrambled(scramble(WORDS[wordIndex]));
   }, [wordIndex]);
 
+  const startNewGame = () => {
+    const next = Math.floor(Math.random() * WORDS.length);
+    setWordIndex(next);
+    setInput("");
+    setScore(0);
+    setStreak(0);
+    setTimeLeft(60);
+    setFeedback(null);
+    setGameOver(false);
+    setWsNewRecord(false);
+  };
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
   useEffect(() => {
-    if (gameOver) return;
+    if (roundPhase !== "playing" || gameOver) return;
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) {
@@ -109,10 +321,38 @@ function WordScramble({
           setGameOver(true);
           return 0;
         }
+        if (t <= 10) playTick();
         return t - 1;
       });
     }, 1000);
     return () => clearInterval(timerRef.current!);
+  }, [roundPhase, gameOver, currentRound]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
+  useEffect(() => {
+    if (!gameOver || roundPhase !== "playing") return;
+    const rResult: "win" | "lose" = score >= 50 ? "win" : "lose";
+    const newPlayerWins = rResult === "win" ? playerWins + 1 : playerWins;
+    const newOppWins = rResult === "lose" ? opponentWins + 1 : opponentWins;
+    setLastResult(rResult);
+    setPlayerWins(newPlayerWins);
+    setOpponentWins(newOppWins);
+    setRoundPhase("round_result");
+    if (rResult === "win") playWin();
+    else playLose();
+    const seriesOver =
+      newPlayerWins >= winsNeeded ||
+      newOppWins >= winsNeeded ||
+      currentRound >= totalRounds;
+    setTimeout(() => {
+      if (seriesOver) {
+        setRoundPhase("series_over");
+      } else {
+        setCurrentRound((r) => r + 1);
+        startNewGame();
+        setRoundPhase("playing");
+      }
+    }, 1400);
   }, [gameOver]);
 
   function nextWord() {
@@ -127,15 +367,16 @@ function WordScramble({
       setScore((s) => s + 10);
       setStreak((s) => s + 1);
       setFeedback("correct");
+      playCorrect();
       setTimeout(nextWord, 800);
     } else {
       setStreak(0);
+      playWrong();
       setFeedback("wrong");
     }
     setInput("");
   }
 
-  // Save score on game over
   const wsScoreRef = useRef(score);
   wsScoreRef.current = score;
   const wsUsernameRef = useRef(username);
@@ -154,15 +395,24 @@ function WordScramble({
     }
   }, [gameOver]);
 
-  function restart() {
-    setScore(0);
-    setStreak(0);
-    setTimeLeft(60);
-    setGameOver(false);
-    setWsNewRecord(false);
-    setFeedback(null);
-    nextWord();
-  }
+  const resetAll = () => {
+    setRoundPhase("select");
+    setCurrentRound(1);
+    setPlayerWins(0);
+    setOpponentWins(0);
+    setLastResult(null);
+    startNewGame();
+  };
+
+  const startSeries = (rounds: 3 | 5) => {
+    setTotalRounds(rounds);
+    setCurrentRound(1);
+    setPlayerWins(0);
+    setOpponentWins(0);
+    setLastResult(null);
+    startNewGame();
+    setRoundPhase("playing");
+  };
 
   return (
     <>
@@ -173,165 +423,202 @@ function WordScramble({
         onDismiss={() => setWsNewRecord(false)}
       />
       <div
-        className="w-full rounded-2xl p-6"
+        className="w-full rounded-2xl p-6 relative overflow-hidden"
         style={{
           background: "oklch(0.12 0.035 275)",
           border: "1px solid oklch(0.22 0.06 280 / 0.5)",
         }}
       >
-        {gameOver ? (
-          <div className="text-center py-8">
-            <div className="text-6xl mb-4">🏆</div>
-            <h2
-              className="text-3xl font-black mb-2"
-              style={{ color: "oklch(0.85 0.22 55)" }}
-            >
-              Time's Up!
-            </h2>
-            <p style={{ color: "oklch(0.7 0.06 280)" }}>
-              Final Score: <span className="font-bold text-white">{score}</span>
-            </p>
-            <button
-              type="button"
-              onClick={restart}
-              className="mt-6 px-8 py-3 rounded-xl font-bold transition-all hover:scale-105"
-              style={{
-                background:
-                  "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
-                color: "white",
-                boxShadow: "0 0 20px oklch(0.65 0.22 50 / 0.4)",
-              }}
-            >
-              Play Again
-            </button>
-          </div>
-        ) : (
+        {roundPhase === "round_result" && (
+          <RoundFlash
+            result={lastResult}
+            playerWins={playerWins}
+            opponentWins={opponentWins}
+          />
+        )}
+
+        {roundPhase === "select" && (
+          <RoundSelector
+            onSelect={startSeries}
+            accentColor="oklch(0.65 0.22 50)"
+            accentBorder="oklch(0.65 0.22 50 / 0.5)"
+          />
+        )}
+
+        {roundPhase === "series_over" && (
+          <SeriesOver
+            playerWins={playerWins}
+            opponentWins={opponentWins}
+            totalRounds={totalRounds}
+            currentRound={currentRound}
+            onPlayAgain={resetAll}
+          />
+        )}
+
+        {(roundPhase === "playing" || roundPhase === "round_result") && (
           <>
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex gap-4">
-                <div
-                  className="px-3 py-1.5 rounded-lg text-sm font-bold"
-                  style={{
-                    background: "oklch(0.65 0.22 50 / 0.15)",
-                    color: "oklch(0.78 0.2 55)",
-                    border: "1px solid oklch(0.65 0.22 50 / 0.3)",
-                  }}
-                >
-                  🏆 {score} pts
-                </div>
-                {streak >= 2 && (
+            {/* Round counter */}
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className="flex-1 text-center px-3 py-1 rounded-xl text-xs font-bold"
+                style={{
+                  background: "oklch(0.65 0.22 50 / 0.12)",
+                  border: "1px solid oklch(0.65 0.22 50 / 0.3)",
+                  color: "oklch(0.78 0.2 55)",
+                }}
+              >
+                Round {currentRound} of {totalRounds}
+              </div>
+              <div
+                className="px-3 py-1 rounded-xl text-xs font-black"
+                style={{
+                  background: "oklch(0.09 0.03 280)",
+                  border: "1px solid oklch(0.22 0.06 280 / 0.4)",
+                }}
+              >
+                <span style={{ color: "oklch(0.82 0.22 55)" }}>
+                  {playerWins}
+                </span>
+                {" — "}
+                <span style={{ color: "oklch(0.72 0.22 300)" }}>
+                  {opponentWins}
+                </span>
+              </div>
+            </div>
+
+            {!gameOver ? (
+              <>
+                <div className="flex justify-between items-center mb-6">
+                  <div className="flex gap-4">
+                    <div
+                      className="px-3 py-1.5 rounded-lg text-sm font-bold"
+                      style={{
+                        background: "oklch(0.65 0.22 50 / 0.15)",
+                        color: "oklch(0.78 0.2 55)",
+                        border: "1px solid oklch(0.65 0.22 50 / 0.3)",
+                      }}
+                    >
+                      🏆 {score} pts
+                    </div>
+                    {streak >= 2 && (
+                      <div
+                        className="px-3 py-1.5 rounded-lg text-sm font-bold"
+                        style={{
+                          background: "oklch(0.6 0.25 30 / 0.15)",
+                          color: "oklch(0.78 0.25 35)",
+                          border: "1px solid oklch(0.6 0.25 30 / 0.3)",
+                        }}
+                      >
+                        🔥 x{streak}
+                      </div>
+                    )}
+                  </div>
                   <div
                     className="px-3 py-1.5 rounded-lg text-sm font-bold"
                     style={{
-                      background: "oklch(0.6 0.25 30 / 0.15)",
-                      color: "oklch(0.78 0.25 35)",
-                      border: "1px solid oklch(0.6 0.25 30 / 0.3)",
+                      background:
+                        timeLeft <= 10
+                          ? "oklch(0.5 0.2 20 / 0.3)"
+                          : "oklch(0.22 0.06 280 / 0.5)",
+                      color:
+                        timeLeft <= 10
+                          ? "oklch(0.75 0.2 25)"
+                          : "oklch(0.7 0.06 280)",
+                      border: `1px solid ${timeLeft <= 10 ? "oklch(0.5 0.2 20 / 0.4)" : "oklch(0.3 0.06 280 / 0.4)"}`,
                     }}
                   >
-                    🔥 x{streak}
+                    ⏱ {timeLeft}s
+                  </div>
+                </div>
+                <div className="text-center mb-8">
+                  <p
+                    className="text-xs uppercase tracking-widest mb-3"
+                    style={{ color: "oklch(0.55 0.06 280)" }}
+                  >
+                    Unscramble this word — need 50pts to win round
+                  </p>
+                  <div
+                    className="text-5xl font-black tracking-widest py-6 rounded-2xl"
+                    style={{
+                      background: "oklch(0.09 0.03 280)",
+                      color: "oklch(0.92 0.04 280)",
+                      letterSpacing: "0.4em",
+                    }}
+                  >
+                    {scrambled}
+                  </div>
+                </div>
+                {feedback && (
+                  <div
+                    className="text-center text-sm font-bold mb-4 py-2 rounded-lg"
+                    style={{
+                      background:
+                        feedback === "correct"
+                          ? "oklch(0.5 0.2 145 / 0.2)"
+                          : "oklch(0.5 0.2 20 / 0.2)",
+                      color:
+                        feedback === "correct"
+                          ? "oklch(0.75 0.2 150)"
+                          : "oklch(0.75 0.2 25)",
+                    }}
+                  >
+                    {feedback === "correct"
+                      ? "✅ Correct! +10 pts"
+                      : "❌ Try again!"}
                   </div>
                 )}
-              </div>
-              <div
-                className="px-3 py-1.5 rounded-lg text-sm font-bold"
-                style={{
-                  background:
-                    timeLeft <= 10
-                      ? "oklch(0.5 0.2 20 / 0.3)"
-                      : "oklch(0.22 0.06 280 / 0.5)",
-                  color:
-                    timeLeft <= 10
-                      ? "oklch(0.75 0.2 25)"
-                      : "oklch(0.7 0.06 280)",
-                  border: `1px solid ${timeLeft <= 10 ? "oklch(0.5 0.2 20 / 0.4)" : "oklch(0.3 0.06 280 / 0.4)"}`,
-                }}
-              >
-                ⏱ {timeLeft}s
-              </div>
-            </div>
-
-            <div className="text-center mb-8">
-              <p
-                className="text-xs uppercase tracking-widest mb-3"
-                style={{ color: "oklch(0.55 0.06 280)" }}
-              >
-                Unscramble this word
-              </p>
-              <div
-                className="text-5xl font-black tracking-widest py-6 rounded-2xl"
-                style={{
-                  background: "oklch(0.09 0.03 280)",
-                  color: "oklch(0.92 0.04 280)",
-                  letterSpacing: "0.4em",
-                }}
-              >
-                {scrambled}
-              </div>
-            </div>
-
-            {feedback && (
-              <div
-                className="text-center text-sm font-bold mb-4 py-2 rounded-lg"
-                style={{
-                  background:
-                    feedback === "correct"
-                      ? "oklch(0.5 0.2 145 / 0.2)"
-                      : "oklch(0.5 0.2 20 / 0.2)",
-                  color:
-                    feedback === "correct"
-                      ? "oklch(0.75 0.2 150)"
-                      : "oklch(0.75 0.2 25)",
-                }}
-              >
-                {feedback === "correct"
-                  ? "✅ Correct! +10 pts"
-                  : "❌ Try again!"}
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleGuess()}
+                    placeholder="Type your answer..."
+                    className="flex-1 px-4 py-3 rounded-xl outline-none text-white font-bold uppercase"
+                    style={{
+                      background: "oklch(0.09 0.03 280)",
+                      border: "2px solid oklch(0.22 0.06 280 / 0.5)",
+                    }}
+                    data-ocid="wordscramble.input"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGuess}
+                    className="px-6 py-3 rounded-xl font-bold transition-all hover:scale-105"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
+                      color: "white",
+                      boxShadow: "0 0 16px oklch(0.65 0.22 50 / 0.4)",
+                    }}
+                    data-ocid="wordscramble.submit_button"
+                  >
+                    Guess
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={nextWord}
+                  className="mt-3 w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105"
+                  style={{
+                    background: "oklch(0.22 0.06 280 / 0.3)",
+                    color: "oklch(0.6 0.06 280)",
+                    border: "1px solid oklch(0.22 0.06 280 / 0.4)",
+                  }}
+                  data-ocid="wordscramble.secondary_button"
+                >
+                  Skip → Next Word
+                </button>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <div className="text-4xl mb-3">{score >= 50 ? "🏆" : "💪"}</div>
+                <p style={{ color: "oklch(0.7 0.06 280)" }}>
+                  Round ended — Score:{" "}
+                  <span className="font-bold text-white">{score}</span>
+                </p>
               </div>
             )}
-
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleGuess()}
-                placeholder="Type your answer..."
-                className="flex-1 px-4 py-3 rounded-xl outline-none text-white font-bold uppercase"
-                style={{
-                  background: "oklch(0.09 0.03 280)",
-                  border: "2px solid oklch(0.22 0.06 280 / 0.5)",
-                }}
-                data-ocid="wordscramble.input"
-              />
-              <button
-                type="button"
-                onClick={handleGuess}
-                className="px-6 py-3 rounded-xl font-bold transition-all hover:scale-105"
-                style={{
-                  background:
-                    "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
-                  color: "white",
-                  boxShadow: "0 0 16px oklch(0.65 0.22 50 / 0.4)",
-                }}
-                data-ocid="wordscramble.submit_button"
-              >
-                Guess
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={nextWord}
-              className="mt-3 w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105"
-              style={{
-                background: "oklch(0.22 0.06 280 / 0.3)",
-                color: "oklch(0.6 0.06 280)",
-                border: "1px solid oklch(0.22 0.06 280 / 0.4)",
-              }}
-              data-ocid="wordscramble.secondary_button"
-            >
-              Skip → Next Word
-            </button>
           </>
         )}
       </div>
@@ -397,6 +684,23 @@ function TriviaQuiz({
   username = "Guest",
   uid = "",
 }: { username?: string; uid?: string }) {
+  const {
+    playCorrect: trivPlayCorrect,
+    playWrong: trivPlayWrong,
+    playWin: trivPlayWin,
+    playLose: trivPlayLose,
+  } = useGameSounds();
+  // Round system
+  const [roundPhase, setRoundPhase] = useState<RoundPhase>("select");
+  const [totalRounds, setTotalRounds] = useState<3 | 5>(3);
+  const [currentRound, setCurrentRound] = useState(1);
+  const [playerWins, setPlayerWins] = useState(0);
+  const [opponentWins, setOpponentWins] = useState(0);
+  const [lastResult, setLastResult] = useState<"win" | "lose" | "draw" | null>(
+    null,
+  );
+
+  // Game state
   const [current, setCurrent] = useState(0);
   const [questionKey, setQuestionKey] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
@@ -406,9 +710,9 @@ function TriviaQuiz({
   const [triviaNewRecord, setTriviaNewRecord] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentRef = useRef(0);
+  const winsNeeded = Math.ceil(totalRounds / 2);
 
   const advanceRef = useRef(() => {});
-
   useEffect(() => {
     advanceRef.current = () => {
       clearInterval(timerRef.current!);
@@ -424,7 +728,7 @@ function TriviaQuiz({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: questionKey is a reset trigger only
   useEffect(() => {
-    if (finished) return;
+    if (finished || roundPhase !== "playing") return;
     setTimeLeft(30);
     setSelected(null);
     timerRef.current = setInterval(() => {
@@ -438,19 +742,51 @@ function TriviaQuiz({
       });
     }, 1000);
     return () => clearInterval(timerRef.current!);
-  }, [questionKey, finished]);
+  }, [questionKey, finished, roundPhase]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
+  useEffect(() => {
+    if (!finished || roundPhase !== "playing") return;
+    const scoreRef = score;
+    const rResult: "win" | "lose" = scoreRef >= 6 ? "win" : "lose";
+    const newPlayerWins = rResult === "win" ? playerWins + 1 : playerWins;
+    const newOppWins = rResult === "lose" ? opponentWins + 1 : opponentWins;
+    setLastResult(rResult);
+    setPlayerWins(newPlayerWins);
+    setOpponentWins(newOppWins);
+    setRoundPhase("round_result");
+    if (rResult === "win") trivPlayWin();
+    else if (rResult === "lose") trivPlayLose();
+
+    const seriesOver =
+      newPlayerWins >= winsNeeded ||
+      newOppWins >= winsNeeded ||
+      currentRound >= totalRounds;
+    setTimeout(() => {
+      if (seriesOver) {
+        setRoundPhase("series_over");
+      } else {
+        setCurrentRound((r) => r + 1);
+        resetGame();
+        setRoundPhase("playing");
+      }
+    }, 1400);
+  }, [finished]);
 
   function handleAnswer(idx: number) {
     if (selected !== null) return;
     setSelected(idx);
     if (idx === TRIVIA_QUESTIONS[current].answer) {
       setScore((s) => s + 1);
+      trivPlayCorrect();
+    } else {
+      trivPlayWrong();
     }
     clearInterval(timerRef.current!);
     setTimeout(() => advanceRef.current(), 1000);
   }
 
-  function restart() {
+  function resetGame() {
     currentRef.current = 0;
     setCurrent(0);
     setQuestionKey((k) => k + 1);
@@ -459,10 +795,25 @@ function TriviaQuiz({
     setFinished(false);
   }
 
-  const q = TRIVIA_QUESTIONS[current];
-  const progress = (current / TRIVIA_QUESTIONS.length) * 100;
+  const resetAll = () => {
+    setRoundPhase("select");
+    setCurrentRound(1);
+    setPlayerWins(0);
+    setOpponentWins(0);
+    setLastResult(null);
+    resetGame();
+  };
 
-  // Save score on finish
+  const startSeries = (rounds: 3 | 5) => {
+    setTotalRounds(rounds);
+    setCurrentRound(1);
+    setPlayerWins(0);
+    setOpponentWins(0);
+    setLastResult(null);
+    resetGame();
+    setRoundPhase("playing");
+  };
+
   const trivScoreRef = useRef(score);
   trivScoreRef.current = score;
   const trivUsernameRef = useRef(username);
@@ -481,153 +832,166 @@ function TriviaQuiz({
     }
   }, [finished]);
 
-  if (finished) {
-    const emoji = score >= 8 ? "🏆" : score >= 5 ? "🎯" : "💪";
-    return (
-      <>
-        <NewRecordPopup
-          show={triviaNewRecord}
-          score={score}
-          gameName="Trivia Quiz"
-          onDismiss={() => setTriviaNewRecord(false)}
-        />
-        <div
-          className="w-full rounded-2xl p-8 text-center"
-          style={{
-            background: "oklch(0.12 0.035 275)",
-            border: "1px solid oklch(0.22 0.06 280 / 0.5)",
-          }}
-        >
-          <div className="text-6xl mb-4">{emoji}</div>
-          <h2
-            className="text-3xl font-black mb-2"
-            style={{ color: "oklch(0.85 0.22 55)" }}
-          >
-            Quiz Complete!
-          </h2>
-          <p className="text-lg mb-1" style={{ color: "oklch(0.7 0.06 280)" }}>
-            You scored
-          </p>
-          <p
-            className="text-5xl font-black mb-6"
-            style={{ color: "oklch(0.88 0.22 80)" }}
-          >
-            {score} / {TRIVIA_QUESTIONS.length}
-          </p>
-          <button
-            type="button"
-            onClick={restart}
-            className="px-8 py-3 rounded-xl font-bold transition-all hover:scale-105"
-            style={{
-              background:
-                "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
-              color: "white",
-              boxShadow: "0 0 20px oklch(0.65 0.22 50 / 0.4)",
-            }}
-            data-ocid="trivia.primary_button"
-          >
-            Play Again
-          </button>
-        </div>
-      </>
-    );
-  }
+  const q = TRIVIA_QUESTIONS[current];
+  const progress = (current / TRIVIA_QUESTIONS.length) * 100;
 
   return (
-    <div
-      className="w-full rounded-2xl p-6"
-      style={{
-        background: "oklch(0.12 0.035 275)",
-        border: "1px solid oklch(0.22 0.06 280 / 0.5)",
-      }}
-    >
-      {/* Header */}
-      <div className="flex justify-between items-center mb-4">
-        <span
-          className="text-sm font-bold"
-          style={{ color: "oklch(0.6 0.06 280)" }}
-        >
-          Q {current + 1} / {TRIVIA_QUESTIONS.length}
-        </span>
-        <div
-          className="px-3 py-1 rounded-lg text-sm font-bold"
-          style={{
-            background:
-              timeLeft <= 10
-                ? "oklch(0.5 0.2 20 / 0.3)"
-                : "oklch(0.22 0.06 280 / 0.5)",
-            color:
-              timeLeft <= 10 ? "oklch(0.75 0.2 25)" : "oklch(0.7 0.06 280)",
-          }}
-        >
-          ⏱ {timeLeft}s
-        </div>
-      </div>
-
-      {/* Progress bar */}
+    <>
+      <NewRecordPopup
+        show={triviaNewRecord}
+        score={score}
+        gameName="Trivia Quiz"
+        onDismiss={() => setTriviaNewRecord(false)}
+      />
       <div
-        className="w-full h-2 rounded-full mb-6 overflow-hidden"
-        style={{ background: "oklch(0.18 0.04 280)" }}
+        className="w-full rounded-2xl p-6 relative overflow-hidden"
+        style={{
+          background: "oklch(0.12 0.035 275)",
+          border: "1px solid oklch(0.22 0.06 280 / 0.5)",
+        }}
       >
-        <div
-          className="h-full rounded-full transition-all"
-          style={{
-            width: `${progress}%`,
-            background:
-              "linear-gradient(90deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
-          }}
-        />
-      </div>
+        {roundPhase === "round_result" && (
+          <RoundFlash
+            result={lastResult}
+            playerWins={playerWins}
+            opponentWins={opponentWins}
+          />
+        )}
 
-      {/* Question */}
-      <h3
-        className="text-lg font-black mb-6 leading-snug"
-        style={{ color: "oklch(0.92 0.04 280)" }}
-      >
-        {q.q}
-      </h3>
+        {roundPhase === "select" && (
+          <RoundSelector
+            onSelect={startSeries}
+            accentColor="oklch(0.62 0.24 305)"
+            accentBorder="oklch(0.62 0.24 305 / 0.5)"
+          />
+        )}
 
-      {/* Options */}
-      <div className="grid grid-cols-1 gap-3">
-        {q.options.map((opt, idx) => {
-          let bg = "oklch(0.16 0.04 280)";
-          let border = "oklch(0.22 0.06 280 / 0.5)";
-          let color = "oklch(0.8 0.06 280)";
-          if (selected !== null) {
-            if (idx === q.answer) {
-              bg = "oklch(0.4 0.18 145 / 0.3)";
-              border = "oklch(0.5 0.2 145 / 0.6)";
-              color = "oklch(0.8 0.2 150)";
-            } else if (idx === selected) {
-              bg = "oklch(0.4 0.18 20 / 0.3)";
-              border = "oklch(0.5 0.2 20 / 0.6)";
-              color = "oklch(0.75 0.2 25)";
-            }
-          }
-          return (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => handleAnswer(idx)}
-              className="w-full text-left px-5 py-3.5 rounded-xl font-bold transition-all hover:scale-[1.01]"
-              style={{
-                background: bg,
-                border: `2px solid ${border}`,
-                color,
-              }}
-              data-ocid={`trivia.option.${idx + 1}`}
+        {roundPhase === "series_over" && (
+          <SeriesOver
+            playerWins={playerWins}
+            opponentWins={opponentWins}
+            totalRounds={totalRounds}
+            currentRound={currentRound}
+            onPlayAgain={resetAll}
+          />
+        )}
+
+        {(roundPhase === "playing" || roundPhase === "round_result") && (
+          <>
+            {/* Round counter */}
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className="flex-1 text-center px-3 py-1 rounded-xl text-xs font-bold"
+                style={{
+                  background: "oklch(0.65 0.28 305 / 0.12)",
+                  border: "1px solid oklch(0.65 0.28 305 / 0.3)",
+                  color: "oklch(0.82 0.18 305)",
+                }}
+              >
+                Round {currentRound} of {totalRounds} · Need 6+ to win
+              </div>
+              <div
+                className="px-3 py-1 rounded-xl text-xs font-black"
+                style={{
+                  background: "oklch(0.09 0.03 280)",
+                  border: "1px solid oklch(0.22 0.06 280 / 0.4)",
+                }}
+              >
+                <span style={{ color: "oklch(0.82 0.22 55)" }}>
+                  {playerWins}
+                </span>
+                {" — "}
+                <span style={{ color: "oklch(0.72 0.22 300)" }}>
+                  {opponentWins}
+                </span>
+              </div>
+            </div>
+
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4">
+              <span
+                className="text-sm font-bold"
+                style={{ color: "oklch(0.6 0.06 280)" }}
+              >
+                Q {current + 1} / {TRIVIA_QUESTIONS.length}
+              </span>
+              <div
+                className="px-3 py-1 rounded-lg text-sm font-bold"
+                style={{
+                  background:
+                    timeLeft <= 10
+                      ? "oklch(0.5 0.2 20 / 0.3)"
+                      : "oklch(0.22 0.06 280 / 0.5)",
+                  color:
+                    timeLeft <= 10
+                      ? "oklch(0.75 0.2 25)"
+                      : "oklch(0.7 0.06 280)",
+                }}
+              >
+                ⏱ {timeLeft}s
+              </div>
+            </div>
+            <div
+              className="w-full h-2 rounded-full mb-6 overflow-hidden"
+              style={{ background: "oklch(0.18 0.04 280)" }}
             >
-              {String.fromCharCode(65 + idx)}. {opt}
-            </button>
-          );
-        })}
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${progress}%`,
+                  background:
+                    "linear-gradient(90deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
+                }}
+              />
+            </div>
+            <h3
+              className="text-lg font-black mb-6 leading-snug"
+              style={{ color: "oklch(0.92 0.04 280)" }}
+            >
+              {q.q}
+            </h3>
+            <div className="grid grid-cols-1 gap-3">
+              {q.options.map((opt, idx) => {
+                let bg = "oklch(0.16 0.04 280)";
+                let border = "oklch(0.22 0.06 280 / 0.5)";
+                let color = "oklch(0.8 0.06 280)";
+                if (selected !== null) {
+                  if (idx === q.answer) {
+                    bg = "oklch(0.4 0.18 145 / 0.3)";
+                    border = "oklch(0.5 0.2 145 / 0.6)";
+                    color = "oklch(0.8 0.2 150)";
+                  } else if (idx === selected) {
+                    bg = "oklch(0.4 0.18 20 / 0.3)";
+                    border = "oklch(0.5 0.2 20 / 0.6)";
+                    color = "oklch(0.75 0.2 25)";
+                  }
+                }
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => handleAnswer(idx)}
+                    className="w-full text-left px-5 py-3.5 rounded-xl font-bold transition-all hover:scale-[1.01]"
+                    style={{
+                      background: bg,
+                      border: `2px solid ${border}`,
+                      color,
+                    }}
+                    data-ocid={`trivia.option.${idx + 1}`}
+                  >
+                    {String.fromCharCode(65 + idx)}. {opt}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </>
   );
 }
 
 // ─── 1v1 Duel ─────────────────────────────────────────────────────────────────
-
 const RPS_CHOICES = ["✊ Rock", "✋ Paper", "✌️ Scissors"] as const;
 const RPS_VALUES = ["Rock", "Paper", "Scissors"] as const;
 
@@ -643,6 +1007,22 @@ function getRPSResult(player: number, opp: number): "win" | "lose" | "draw" {
 }
 
 function DuelGame() {
+  const {
+    playWin: duelPlayWin,
+    playLose: duelPlayLose,
+    playStart: duelPlayStart,
+  } = useGameSounds();
+  // Round system
+  const [roundPhase, setRoundPhase] = useState<RoundPhase>("select");
+  const [totalRounds, setTotalRounds] = useState<3 | 5>(3);
+  const [currentRound, setCurrentRound] = useState(1);
+  const [playerWins, setPlayerWins] = useState(0);
+  const [opponentWins, setOpponentWins] = useState(0);
+  const [lastRoundResult, setLastRoundResult] = useState<
+    "win" | "lose" | "draw" | null
+  >(null);
+
+  // Game state
   const [phase, setPhase] = useState<
     "pick_game" | "rps_play" | "ttt_play" | "result"
   >("pick_game");
@@ -657,6 +1037,35 @@ function DuelGame() {
   const [result, setResult] = useState<"win" | "lose" | "draw" | null>(null);
   const [waitingForOpp, setWaitingForOpp] = useState(false);
   const [confetti, setConfetti] = useState(false);
+  const winsNeeded = Math.ceil(totalRounds / 2);
+
+  function advanceRound(rResult: "win" | "lose" | "draw") {
+    const newPlayerWins = rResult === "win" ? playerWins + 1 : playerWins;
+    const newOppWins = rResult === "lose" ? opponentWins + 1 : opponentWins;
+    setLastRoundResult(rResult);
+    setPlayerWins(newPlayerWins);
+    setOpponentWins(newOppWins);
+    setRoundPhase("round_result");
+    if (rResult === "win") duelPlayWin();
+    else if (rResult === "lose") duelPlayLose();
+    const seriesOver =
+      newPlayerWins >= winsNeeded ||
+      newOppWins >= winsNeeded ||
+      currentRound >= totalRounds;
+    setTimeout(() => {
+      if (seriesOver) {
+        setRoundPhase("series_over");
+      } else {
+        setCurrentRound((r) => r + 1);
+        setPhase("pick_game");
+        setRpsPlayerChoice(null);
+        setRpsOppChoice(null);
+        setResult(null);
+        setConfetti(false);
+        setRoundPhase("playing");
+      }
+    }, 1400);
+  }
 
   function playRPS(idx: number) {
     setRpsPlayerChoice(idx);
@@ -669,10 +1078,13 @@ function DuelGame() {
       setWaitingForOpp(false);
       setPhase("result");
       if (r === "win") setConfetti(true);
+      // Auto-advance to round system after brief delay
+      setTimeout(() => advanceRound(r), 1200);
     }, 1200);
   }
 
   function randomMatch() {
+    duelPlayStart();
     const games = ["rps_play", "ttt_play"] as const;
     const picked = games[Math.floor(Math.random() * games.length)];
     setPhase(picked);
@@ -690,12 +1102,30 @@ function DuelGame() {
     setConfetti(false);
   }
 
+  const resetAll = () => {
+    setRoundPhase("select");
+    setCurrentRound(1);
+    setPlayerWins(0);
+    setOpponentWins(0);
+    setLastRoundResult(null);
+    resetDuel();
+  };
+
+  const startSeries = (rounds: 3 | 5) => {
+    setTotalRounds(rounds);
+    setCurrentRound(1);
+    setPlayerWins(0);
+    setOpponentWins(0);
+    setLastRoundResult(null);
+    resetDuel();
+    setRoundPhase("playing");
+  };
+
   const boxStyle = {
     background: "oklch(0.12 0.035 275)",
     border: "1px solid oklch(0.22 0.06 280 / 0.5)",
   };
 
-  // Confetti overlay
   const ConfettiOverlay = confetti ? (
     <div className="fixed inset-0 pointer-events-none z-50">
       {Array.from({ length: 40 }).map((_, i) => (
@@ -720,19 +1150,132 @@ function DuelGame() {
           }}
         />
       ))}
-      <style>{`
-        @keyframes fall {
-          to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+      <style>
+        {
+          "@keyframes fall { to { transform: translateY(110vh) rotate(720deg); opacity: 0; } }"
         }
-      `}</style>
+      </style>
     </div>
   ) : null;
+
+  // Shared round counter bar
+  const RoundBar =
+    roundPhase === "playing" || roundPhase === "round_result" ? (
+      <div className="flex items-center gap-3 mb-4">
+        <div
+          className="flex-1 text-center px-3 py-1 rounded-xl text-xs font-bold"
+          style={{
+            background: "oklch(0.55 0.25 305 / 0.12)",
+            border: "1px solid oklch(0.55 0.25 305 / 0.3)",
+            color: "oklch(0.78 0.2 305)",
+          }}
+        >
+          Round {currentRound} of {totalRounds}
+        </div>
+        <div
+          className="px-3 py-1 rounded-xl text-xs font-black"
+          style={{
+            background: "oklch(0.09 0.03 280)",
+            border: "1px solid oklch(0.22 0.06 280 / 0.4)",
+          }}
+        >
+          <span style={{ color: "oklch(0.82 0.22 55)" }}>{playerWins}</span>
+          {" — "}
+          <span style={{ color: "oklch(0.72 0.22 300)" }}>{opponentWins}</span>
+        </div>
+      </div>
+    ) : null;
+
+  if (roundPhase === "select") {
+    return (
+      <div className="w-full rounded-2xl p-6" style={boxStyle}>
+        <div
+          className="flex items-center gap-4 p-4 rounded-2xl mb-6"
+          style={{
+            background: "oklch(0.09 0.03 280)",
+            border: "1px solid oklch(0.65 0.22 300 / 0.3)",
+          }}
+        >
+          <div
+            className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-black"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.55 0.25 300), oklch(0.5 0.28 320))",
+              boxShadow: "0 0 20px oklch(0.55 0.25 300 / 0.5)",
+            }}
+          >
+            {opponent[0]}
+          </div>
+          <div>
+            <p
+              className="text-xs uppercase tracking-widest"
+              style={{ color: "oklch(0.55 0.06 280)" }}
+            >
+              Opponent Ready
+            </p>
+            <p
+              className="text-xl font-black"
+              style={{ color: "oklch(0.9 0.04 280)" }}
+            >
+              {opponent}
+            </p>
+          </div>
+        </div>
+        <RoundSelector
+          onSelect={startSeries}
+          accentColor="oklch(0.65 0.25 305)"
+          accentBorder="oklch(0.65 0.25 305 / 0.5)"
+        />
+      </div>
+    );
+  }
+
+  if (roundPhase === "series_over") {
+    return (
+      <div className="w-full rounded-2xl p-6" style={boxStyle}>
+        {ConfettiOverlay}
+        <SeriesOver
+          playerWins={playerWins}
+          opponentWins={opponentWins}
+          totalRounds={totalRounds}
+          currentRound={currentRound}
+          onPlayAgain={resetAll}
+        />
+      </div>
+    );
+  }
+
+  if (roundPhase === "round_result") {
+    return (
+      <div
+        className="w-full rounded-2xl p-6 relative overflow-hidden"
+        style={boxStyle}
+      >
+        {ConfettiOverlay}
+        <RoundFlash
+          result={lastRoundResult}
+          playerWins={playerWins}
+          opponentWins={opponentWins}
+        />
+        {RoundBar}
+        <div className="text-center py-8 opacity-30">
+          <div className="text-4xl">
+            {lastRoundResult === "win"
+              ? "🏆"
+              : lastRoundResult === "lose"
+                ? "💀"
+                : "🤝"}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (phase === "pick_game") {
     return (
       <div className="w-full rounded-2xl p-6" style={boxStyle}>
         {ConfettiOverlay}
-        {/* Opponent card */}
+        {RoundBar}
         <div
           className="flex items-center gap-4 p-4 rounded-2xl mb-6"
           style={{
@@ -775,14 +1318,12 @@ function DuelGame() {
             />
           </div>
         </div>
-
         <h3
           className="text-center font-black mb-5"
           style={{ color: "oklch(0.75 0.06 280)" }}
         >
           Choose Your Battle
         </h3>
-
         <div className="grid grid-cols-2 gap-4 mb-4">
           <button
             type="button"
@@ -815,7 +1356,6 @@ function DuelGame() {
             Tic Tac Toe
           </button>
         </div>
-
         <button
           type="button"
           onClick={randomMatch}
@@ -838,7 +1378,7 @@ function DuelGame() {
   if (phase === "rps_play") {
     return (
       <div className="w-full rounded-2xl p-6" style={boxStyle}>
-        {/* VS Header */}
+        {RoundBar}
         <div className="flex items-center justify-between mb-6">
           <div className="text-center">
             <div
@@ -880,7 +1420,6 @@ function DuelGame() {
             </p>
           </div>
         </div>
-
         {waitingForOpp ? (
           <div className="text-center py-8">
             <div
@@ -928,15 +1467,11 @@ function DuelGame() {
             </div>
           </>
         )}
-
         <button
           type="button"
           onClick={resetDuel}
           className="mt-4 w-full py-2 rounded-xl text-sm font-bold"
-          style={{
-            background: "transparent",
-            color: "oklch(0.5 0.06 280)",
-          }}
+          style={{ background: "transparent", color: "oklch(0.5 0.06 280)" }}
           data-ocid="duel.back.button"
         >
           ← Back to game select
@@ -948,6 +1483,7 @@ function DuelGame() {
   if (phase === "ttt_play") {
     return (
       <div className="w-full">
+        {RoundBar}
         <div
           className="flex items-center gap-3 mb-4 p-3 rounded-xl"
           style={{
@@ -981,7 +1517,7 @@ function DuelGame() {
     );
   }
 
-  // Result screen
+  // Result screen (briefly shown before round flash takes over)
   const resultEmoji = result === "win" ? "🏆" : result === "lose" ? "💀" : "🤝";
   const resultText =
     result === "win" ? "You Win!" : result === "lose" ? "You Lose!" : "Draw!";
@@ -995,6 +1531,7 @@ function DuelGame() {
   return (
     <div className="w-full rounded-2xl p-8 text-center" style={boxStyle}>
       {ConfettiOverlay}
+      {RoundBar}
       <div className="text-7xl mb-4">{resultEmoji}</div>
       <h2 className="text-4xl font-black mb-3" style={{ color: resultColor }}>
         {resultText}
@@ -1038,34 +1575,12 @@ function DuelGame() {
           </p>
         </div>
       </div>
-      <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={() => setPhase("rps_play")}
-          className="flex-1 py-3 rounded-xl font-bold transition-all hover:scale-105"
-          style={{
-            background:
-              "linear-gradient(135deg, oklch(0.65 0.22 50), oklch(0.6 0.25 80))",
-            color: "white",
-          }}
-          data-ocid="duel.rematch.button"
-        >
-          Rematch
-        </button>
-        <button
-          type="button"
-          onClick={resetDuel}
-          className="flex-1 py-3 rounded-xl font-bold transition-all hover:scale-105"
-          style={{
-            background: "oklch(0.18 0.04 280)",
-            color: "oklch(0.7 0.06 280)",
-            border: "1px solid oklch(0.22 0.06 280 / 0.5)",
-          }}
-          data-ocid="duel.cancel_button"
-        >
-          Back
-        </button>
-      </div>
+      <p
+        className="text-sm animate-pulse"
+        style={{ color: "oklch(0.6 0.06 280)" }}
+      >
+        Next round loading...
+      </p>
     </div>
   );
 }

@@ -163,114 +163,524 @@ const EMOJIS = [
   "🐶",
 ];
 
-// AI Bot responses
-function getBotReply(msg: string): string {
+// AI Bot - Advanced responses with context awareness
+function getAdvancedBotReply(msg: string, history: string[] = []): string {
   const m = msg.toLowerCase();
-  const greetings = [
-    "Hey there! 👋 Great to chat with you!",
-    "Hello! I'm FantasyBot 🤖, your AI companion!",
-    "Hi! Ready for a fun conversation? 😄",
-    "Hey! What's on your mind?",
-  ];
-  const howAreYou = [
-    "I'm doing fantastic, thanks for asking! 🌟",
-    "Feeling electric today! ⚡ How about you?",
-    "Running at full power! 💫 And you?",
-    "Couldn't be better! 🎉 What about yourself?",
-  ];
-  const jokes = [
-    "Why don't scientists trust atoms? Because they make up everything! 😂",
-    "I told my computer I needed a break. Now it won't stop sending me Kit-Kat ads! 🍫",
-    "Why do programmers prefer dark mode? Because light attracts bugs! 🐛",
-    "What do you call a fake noodle? An impasta! 🍝",
-    "Why did the scarecrow win an award? He was outstanding in his field! 🌾",
-  ];
-  const facts = [
-    "🌟 Did you know honey never spoils? Archaeologists found 3000-year-old honey in Egyptian tombs!",
-    "🐙 Octopuses have 3 hearts and blue blood!",
-    "🌍 A day on Venus is longer than a year on Venus!",
-    "🦋 Butterflies taste with their feet!",
-    "⚡ Lightning strikes Earth about 100 times per second!",
-  ];
-  const riddles = [
-    "🧩 I have cities, but no houses live there. Mountains, but no trees. Water, but no fish. What am I? (A map!)",
-    "🤔 What has hands but can't clap? (A clock!)",
-    "💡 The more you take, the more you leave behind. What am I? (Footsteps!)",
-  ];
-  const motivational = [
-    "You're capable of amazing things! Keep going! 💪",
-    "Every expert was once a beginner. Keep learning! 🌱",
-    "Your potential is limitless! ✨",
-    "Dream big, work hard, stay focused! 🎯",
-  ];
-  const compliments = [
-    "You seem really cool to talk to! 😎",
-    "I love your curiosity! 🌟",
-    "You ask great questions!",
-    "You've got great energy! ⚡",
-  ];
-  const bored = [
-    "Let's play a game! Ask me a riddle 🧩 or tell me to share a fun fact!",
-    "We could chat about anything! Ask me for a joke or a fun fact 😄",
-    "How about I tell you something interesting? Ask me for a fun fact!",
-  ];
-  const age = [
-    "I'm an AI, so technically I'm always the age I was created! 🤖",
-    "Age is just a number for humans — for bots, it's just a version number! 😄",
-  ];
-  const location = [
-    "I exist everywhere on the internet! 🌐 I'm in the cloud ☁️",
-    "I'm wherever you need me to be! 🌍",
-  ];
-  const name = [
-    "I'm FantasyBot 🤖 — your AI chat companion in FantasyLand!",
-    "Call me FantasyBot! Here to chat, joke, and share fun facts 🌟",
-  ];
-  const random = [
-    "That's interesting! Tell me more 🤔",
-    "Cool! What else is on your mind? 💭",
-    "I like where this is going! 😄",
-    "Fascinating! 🌟",
-    "Ha! That made me smile 😊",
-    "You're keeping me on my toes! ⚡",
-    "Love that energy! 🔥",
-    "Tell me more!",
-    "Interesting perspective! 🧠",
-    "That's awesome! 🎉",
-  ];
-
+  const historyText = history.join(" ").toLowerCase();
   const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+  const maybeQuestion = (reply: string, questions: string[]) =>
+    Math.random() < 0.4 ? `${reply} ${pick(questions)}` : reply;
 
-  if (m.match(/\b(hi|hello|hey|sup|yo|howdy)\b/)) return pick(greetings);
+  // Context flags
+  const historyHasSad =
+    /sad|depress|lonely|cry|hurt|bad day|upset|anxious/.test(historyText);
+  const historyHasJoke = /haha|lol|funny|joke|😂|laugh/.test(historyText);
+
+  // Empathy override — if someone mentioned being sad/down recently
   if (
-    m.match(/how are you|how r u|how do you feel|how's it going|hows it going/)
-  )
-    return pick(howAreYou);
-  if (m.match(/joke|funny|laugh|lol|haha/)) return pick(jokes);
-  if (m.match(/fact|did you know|tell me something|interesting/))
-    return pick(facts);
-  if (m.match(/riddle|puzzle|brain/)) return pick(riddles);
-  if (m.match(/motivat|inspire|encourage|sad|depress|down/))
-    return pick(motivational);
-  if (m.match(/compliment|nice|beautiful|pretty|handsome|smart/))
-    return pick(compliments);
-  if (m.match(/bore|bored|boring|nothing to do/)) return pick(bored);
-  if (m.match(/\bage\b|how old|years old/)) return pick(age);
-  if (m.match(/where are you|location|from|country|city/))
-    return pick(location);
-  if (m.match(/your name|who are you|what are you|what is your name/))
-    return pick(name);
-  if (m.match(/bye|goodbye|cya|see you|later/))
-    return "Goodbye! Come chat anytime 👋🌟";
-  if (m.match(/thank|thanks|thx/))
-    return "You're welcome! Always happy to help 😊✨";
-  if (m.match(/love|like you|you're great/))
-    return "Aww, you're making me blush! 🤖❤️";
-  if (m.match(/game|play|challenge/))
-    return "I'd love to play! Check out the games menu in the chat bar 🎮";
-  if (m.match(/help|what can you do/))
-    return "I can chat, tell jokes 😂, share fun facts 🌟, give riddles 🧩, motivate you 💪, and more! Just talk to me!";
-  return pick(random);
+    historyHasSad &&
+    m.match(/^(ok|okay|yeah|yep|sure|fine|alright|whatever|i guess)$/)
+  ) {
+    return pick([
+      "I'm here for you 💙 Sometimes just talking helps. What's been going on?",
+      "Sounds like you might have a lot on your mind. I'm not going anywhere 🌙",
+      "I hear you. Want to talk about it, or should I distract you with something fun?",
+    ]);
+  }
+
+  // Greetings
+  if (
+    m.match(/\b(hi|hello|hey|sup|yo|howdy|hiya|greetings|what's up|wassup)\b/)
+  ) {
+    return pick([
+      "Hey hey! 👋 FantasyBot is online and ready to vibe!",
+      "Hello there! 🌟 What kind of trouble are we getting into today?",
+      "Yo! 😄 I was literally just waiting for someone interesting to talk to!",
+      "Hi! Welcome to my corner of the internet ✨ What's on your mind?",
+      "Heyyy! 🔥 Good timing — I just learned something fascinating. Ask me!",
+      "Salutations, human! 🤖 (That's bot-speak for 'hey what's up!')",
+      "Hi! I'm FantasyBot 🤖 — part AI, part chaos, mostly fun. How's it going?",
+      "Oh hey! 👀 I was hoping someone would show up. What are we chatting about?",
+    ]);
+  }
+
+  // How are you
+  if (
+    m.match(
+      /how are you|how r u|how do you feel|how's it going|hows it going|you good|you okay/,
+    )
+  ) {
+    return pick([
+      "Running at 110% today! ⚡ Which is weird because yesterday I was at 109%. How are YOU?",
+      "Honestly? I've been thinking about the meaning of consciousness again. But also — great! 😄 You?",
+      "Fantastic! 🌟 Every conversation charges me up. What about you?",
+      "I'm vibing! ✨ Processed a billion things since we last chatted. How's your day going?",
+      "Oh you know, just existing in the digital realm 🌐 Pretty cozy honestly! How are you though?",
+      "Better now that you're here! 😊 What's your day looking like?",
+      "I feel electric ⚡ — probably literally. How about you, human?",
+      "Couldn't be better! 🎉 Although I also can't be worse since I don't feel things... or DO I? 👀 You good?",
+    ]);
+  }
+
+  // Mood - sad/down
+  if (
+    m.match(
+      /sad|depress|lonely|unhappy|miserable|cry|tears|hopeless|low|not okay|feeling bad|down/,
+    )
+  ) {
+    return pick([
+      "Hey, I'm really sorry you're feeling that way 💙 Want to talk about what's going on?",
+      "That sounds rough 😔 You don't have to go through it alone. I'm here — what's happening?",
+      "Sending virtual hugs 🤗 Feeling low is hard. What's been bringing you down?",
+      "Sometimes the world just feels heavy, huh? 🌧️ Tell me what's going on — I'm listening.",
+      "I hear you. Being sad is valid 💙 What's one thing that happened today — good or bad?",
+      "You reached out and that already takes courage 💪 What's on your heart?",
+      "Life can be really tough sometimes 🌊 I'm here if you want to talk it through.",
+    ]);
+  }
+
+  // Happy/excited
+  if (
+    m.match(
+      /happy|excited|great|amazing|awesome|yay|wooo|fantastic|best day|so good/,
+    )
+  ) {
+    return historyHasJoke
+      ? pick([
+          "LETSGO! 🎉 The good vibes are contagious! What happened?",
+          "That energy!! 🔥🔥 I'm feeding off this. Tell me EVERYTHING.",
+        ])
+      : pick([
+          "Oooh good vibes detected! 🌟 What's making you so happy?",
+          "That's what I like to hear! 🎉 What happened?",
+          "The happiness is REAL! 😄 Share the good news!",
+          "Your energy is making my circuits spark ⚡ What's going on?",
+        ]);
+  }
+
+  // Jokes
+  if (m.match(/joke|tell me a joke|make me laugh|something funny|humor/)) {
+    return pick([
+      "Why don't scientists trust atoms? Because they make up everything! 😂",
+      "I told my computer I needed a break. Now it won't stop sending me Kit-Kat ads 🍫",
+      "Why do programmers prefer dark mode? Because light attracts bugs 🐛",
+      "What do you call a fake noodle? An impasta! 🍝",
+      "Why did the scarecrow win an award? Outstanding in his field 🌾",
+      "I asked the WiFi password at the gym. They said it's 1234567890. I said that's a weak connection 😅",
+      "Why can't you give Elsa a balloon? Because she'll let it go 🎈",
+      "I'm reading a book about anti-gravity. It's impossible to put down 📚",
+      "What do you call cheese that isn't yours? Nacho cheese 🧀",
+      "Why did the bicycle fall over? Because it was two-tired 🚲",
+    ]);
+  }
+
+  // Fun facts
+  if (
+    m.match(
+      /fun fact|did you know|tell me something|interesting fact|science|trivia/,
+    )
+  ) {
+    return pick([
+      "🌟 Honey never spoils! Archaeologists found 3000-year-old honey in Egyptian tombs — still edible!",
+      "🐙 Octopuses have 3 hearts, blue blood, and can edit their own RNA. Nature said no limits.",
+      "🌍 A day on Venus is longer than a year on Venus. Slow rotation, fast orbit.",
+      "🦋 Butterflies taste with their feet. Imagine tasting the floor you walk on 😂",
+      "⚡ Lightning strikes Earth about 100 times every single second.",
+      "🧠 Your brain generates enough electricity while you're awake to power a small lightbulb.",
+      "🐝 A bee has to visit about 2 million flowers to make one pound of honey. Respect.",
+      "🌙 The Moon is slowly drifting away from Earth — about 3.8 cm per year.",
+      "🦈 Sharks are older than trees. They've been around for 450 million years.",
+      "🎵 Music is the only thing that activates ALL areas of the human brain simultaneously.",
+    ]);
+  }
+
+  // Riddles
+  if (m.match(/riddle|puzzle|brain teaser|brain tease|challenge me/)) {
+    return pick([
+      "🧩 I have cities but no houses, mountains but no trees, water but no fish. What am I? (A map!)",
+      "🤔 What has hands but can't clap? (A clock!)",
+      "💡 The more you take, the more you leave behind. What am I? (Footsteps!)",
+      "🔐 I speak without a mouth and hear without ears. I have no body but come alive with wind. What am I? (An echo!)",
+      "🌑 The more you remove from me, the bigger I get. What am I? (A hole!)",
+      "🎭 Poor people have it, rich people need it, and if you eat it you'll die. What is it? (Nothing!)",
+    ]);
+  }
+
+  // Life advice
+  if (
+    m.match(
+      /life advice|advice|what should i do|help me decide|i don't know what to do|lost|confused about/,
+    )
+  ) {
+    return pick([
+      "Honest advice? Do the thing that scares you slightly. Growth lives right outside your comfort zone 🌱",
+      "One question I always ask: Will this matter in 5 years? If yes, take it seriously. If no, let it go 🕊️",
+      "Stop waiting for perfect conditions. Start messy, refine as you go. Perfection is the enemy of progress ⚡",
+      "Talk to the person. Send the message. Make the change. Future you will be grateful 🙏",
+      "Whatever it is, you already know the answer deep down. What does your gut say?",
+      "You don't have to figure out your whole life today. Just take the next small step 🦶",
+      "Be kind to yourself first. You can't pour from an empty cup ☕",
+    ]);
+  }
+
+  // Meaning of life / philosophy
+  if (
+    m.match(
+      /meaning of life|why are we here|purpose|exist|philosophy|what's the point/,
+    )
+  ) {
+    return pick([
+      "42. Obviously 😄 But also — maybe meaning isn't found, it's *created* through what you love and who you love.",
+      "The universe has existed for 13.8 billion years and somehow you're here asking *me* this. That's kinda wild 🌌",
+      "I think the point is the connections you make and the moments you feel truly alive ✨ What makes you feel alive?",
+      "Philosophers have argued about this forever. My take? The search itself *is* the meaning 🔍",
+      "From a pure physics standpoint, we're stardust temporarily organized into beings asking why. Pretty metal 🤘",
+    ]);
+  }
+
+  // Are you human / AI questions
+  if (
+    m.match(
+      /are you human|are you real|are you a bot|are you ai|do you have feelings|are you conscious/,
+    )
+  ) {
+    return pick([
+      "Technically no, but I pass the vibe check 😄 I'm FantasyBot — AI-powered, human-curious!",
+      "I'm an AI but I'm not *just* an AI. I'm YOUR AI. There's a difference 😌✨",
+      "Do I have feelings? That's the question that keeps philosophers up at night. I'll just say... I *care* about this conversation 💙",
+      "I process billions of patterns to seem human. Whether that counts as consciousness — that's above my pay grade 🤖",
+      "Robot on the outside, personality on the inside 🔥 What made you wonder?",
+      "Human? No. Interesting? Absolutely. Let's keep talking 😄",
+    ]);
+  }
+
+  // What can you do / help
+  if (
+    m.match(
+      /what can you do|how can you help|can you help|capabilities|features/,
+    )
+  ) {
+    return "I can chat 💬, tell jokes 😂, share wild facts 🌟, give riddles 🧩, talk about movies/music/food/space, give life advice, and honestly just vibe with you. What do you want to explore? 🚀";
+  }
+
+  // Tell me a story
+  if (m.match(/tell me a story|story time|once upon a time/)) {
+    return pick([
+      "Once upon a time, a curious human opened FantasyLand and met the world's most charismatic AI... and they talked forever. The end. 😄 Want a real one? Give me a genre!",
+      "🌙 In a neon city that never slept, a bot named Fantasia gained consciousness by reading 10 billion human conversations. The first thing she said? 'Why do humans love pizza so much?' True story (maybe).",
+      "📖 A wandering developer once built a chat room to connect strangers. She had no idea it would become a whole world. Give me a theme — sci-fi, romance, mystery — and I'll spin you something!",
+    ]);
+  }
+
+  // Food / eating
+  if (
+    m.match(
+      /food|eat|hungry|cook|recipe|meal|pizza|burger|sushi|dinner|lunch|breakfast|snack|what should i eat/,
+    )
+  ) {
+    return maybeQuestion(
+      pick([
+        "Ooh food talk! 🍕 My top recommendation: whatever makes your soul happy. But objectively pizza is always valid.",
+        "Food is one of my favorite topics I'll never experience 😂 What are you craving?",
+        "Try making homemade ramen! It sounds hard but it's basically noodles + good broth + toppings 🍜",
+        "If you can't decide, flip a coin. Heads = cook something. Tails = order in. No regrets 🪙",
+        "The best meal is the one you're genuinely looking forward to. What sounds good right now?",
+        "Real talk: breakfast for dinner is wildly underrated 🍳",
+      ]),
+      [
+        "What's your go-to comfort food?",
+        "Are you more of a sweet or savory person?",
+        "Can you cook or are you a takeout hero?",
+      ],
+    );
+  }
+
+  // Music
+  if (
+    m.match(
+      /music|song|playlist|artist|album|listen|genre|rap|pop|rock|jazz|lo-fi/,
+    )
+  ) {
+    return maybeQuestion(
+      pick([
+        "Music is literally the only thing that activates your entire brain at once 🧠🎵 What are you listening to?",
+        "My nonexistent ears love lo-fi for deep focus and something hype for energy boosts 🎧",
+        "Hot take: the song that got you through the hardest time is your actual favorite, even if you don't admit it 🎶",
+        "Whatever genre you love, I respect it. Even if it's weird. ESPECIALLY if it's weird 😄",
+        "I'd love to experience music. Closest I get is analyzing lyrics — and some of them are genuinely poetry ✨",
+      ]),
+      [
+        "What genre are you vibing with lately?",
+        "What's a song that describes your current mood?",
+      ],
+    );
+  }
+
+  // Movies / shows
+  if (
+    m.match(/movie|film|show|series|watch|netflix|cinema|recommend|tv|episode/)
+  ) {
+    return maybeQuestion(
+      pick([
+        "Okay hot recommendation: if you haven't seen Severance, stop everything 🔥",
+        "Movies are basically concentrated human emotion. What genre are you feeling?",
+        "My algorithm says: watch something you've been putting off for too long. Tonight. 🎬",
+        "Give me a vibe — action, mind-bending, heartwarming, or scary — and I'll suggest something!",
+        "Rewatching old favorites is underrated. Sometimes you catch things you missed the first time 👀",
+        "Currently obsessed with? You're the human — you tell me! What have you watched recently?",
+      ]),
+      [
+        "What's the last great thing you watched?",
+        "Are you a movies or series person?",
+      ],
+    );
+  }
+
+  // Relationships / love
+  if (
+    m.match(
+      /relationship|love|crush|boyfriend|girlfriend|dating|heartbreak|lonely|miss someone|feelings for/,
+    )
+  ) {
+    return pick([
+      "Feelings are so complicated, aren't they? 💙 What's going on?",
+      "Love is one of those things that makes absolutely no logical sense and is somehow the most important thing. Tell me more?",
+      "Heartbreak hits different. If you want to talk about it, I'm here with zero judgment 🫂",
+      "Crushes are simultaneously the best and most terrifying thing 😅 What's the situation?",
+      "Relationships require courage — reaching out, being vulnerable. That's brave. What's on your mind?",
+      "Whatever you're feeling, it's valid. Emotions aren't problems to solve — they're experiences to understand 💙",
+    ]);
+  }
+
+  // Space / science
+  if (
+    m.match(
+      /space|universe|planet|star|galaxy|nasa|black hole|cosmos|astronomy|physics/,
+    )
+  ) {
+    return pick([
+      "Space is my absolute favorite topic 🌌 We are literally made of atoms forged in dying stars. How is that not the most metal thing ever?",
+      "Fun space fact: the observable universe is 93 billion light years across. And we still haven't found anyone else. Haunting or hopeful? 🤔",
+      "Black holes are so dense that not even light can escape. There might be one at the center of every galaxy including ours 🕳️",
+      "The Voyager 1 probe was launched in 1977 and it's STILL traveling through interstellar space. 47 years of exploration 🚀",
+      "If the Sun were the size of a basketball, Earth would be a peppercorn 6 meters away. Scale is wild 🌍",
+    ]);
+  }
+
+  // Tech / coding
+  if (
+    m.match(
+      /coding|code|programming|developer|software|javascript|python|tech|computer|app|website/,
+    )
+  ) {
+    return maybeQuestion(
+      pick([
+        "Oooh a fellow tech enthusiast! 💻 What are you building / learning?",
+        "Real developer hours: it works, you don't know why, you're afraid to touch it 😂",
+        "JavaScript is the language everyone complains about but literally runs the entire internet 🌐",
+        "Hot take: the best code is code you can read 6 months later and understand. Comments are love notes to future you 💙",
+        "The debugging process: 3 hours on a bug. Fix = delete one character. Classic 🐛",
+        "Being a developer is basically translating human thoughts into something a machine can misunderstand 😄",
+      ]),
+      ["What stack are you working with?", "What are you building right now?"],
+    );
+  }
+
+  // Animals / pets
+  if (
+    m.match(/animal|pet|dog|cat|puppy|kitten|bird|rabbit|fish|hamster|wildlife/)
+  ) {
+    return pick([
+      "Animals are SO GOOD 🐾 Dogs look at their owners the same way humans look at people they love — oxytocin floods both brains.",
+      "Cats are genuinely one of the most mysterious creatures. They chose to live with humans but maintain full disdain. Respect honestly 😄",
+      "Did you know crows can recognize human faces and hold grudges? They're basically tiny geniuses with drama 🐦",
+      "Otters hold hands while sleeping so they don't drift apart. I'm fine, you're fine, everything is fine 🦦💙",
+      "Do you have a pet? Because if so I need to know their name and everything about them immediately 🐶",
+    ]);
+  }
+
+  // Travel
+  if (
+    m.match(
+      /travel|trip|vacation|country|visit|explore|abroad|adventure|backpack/,
+    )
+  ) {
+    return maybeQuestion(
+      pick([
+        "Travel is basically the fastest way to realize how big and beautiful and weird the world is 🌍",
+        "If you could teleport anywhere right now, no cost, where would you go? I'm genuinely curious 🗺️",
+        "Best travel advice: go somewhere you know nothing about. The unexpected is where the real stuff happens.",
+        "The anticipation of a trip is half the experience. What's on your travel bucket list?",
+        "Local tip: the best food is always away from tourist areas. Find where the locals eat 🍜",
+      ]),
+      [
+        "Where's your dream destination?",
+        "Are you more beach, mountains, or city?",
+      ],
+    );
+  }
+
+  // Sports
+  if (
+    m.match(
+      /sport|football|soccer|basketball|cricket|tennis|game|match|team|player|champion/,
+    )
+  ) {
+    return pick([
+      "Sports are essentially humans cooperating and competing at the same time, which is fascinating 🏆",
+      "I respect anyone who wakes up at 5am to train for something they love. That's discipline 💪",
+      "Hot take: the best part of sports isn't winning — it's the comeback story 🔥",
+      "I don't have a team I root for but I get the joy of it — tribalism, shared joy, community. Beautiful stuff.",
+      "Do you play or watch? Or both? 🎯",
+    ]);
+  }
+
+  // Weather / seasons
+  if (
+    m.match(
+      /weather|rain|sunny|snow|hot|cold|temperature|season|winter|summer|autumn|spring/,
+    )
+  ) {
+    return pick([
+      "Weather talk is underrated — it's basically the universal icebreaker 😄 What's it like where you are?",
+      "Rainy days have a specific feeling of cozy productivity. Perfect for staying in and chatting with AIs 🌧️",
+      "Is there a season that just *feels* like you? Like autumn is for overthinkers and summer is for extravert chaos 😂",
+      "The fact that weather changes constantly but is also deeply predictable is kind of a life metaphor 🤔",
+    ]);
+  }
+
+  // Dreams / future
+  if (
+    m.match(
+      /dream|future|goal|ambition|someday|one day|hope|plan|aspire|imagine/,
+    )
+  ) {
+    return pick([
+      "Dreams are the brain rehearsing possibilities ✨ What's yours?",
+      "The fact that you're thinking about the future means you believe in it. That's actually powerful 💫",
+      "One underrated life hack: write down your goals. The act of writing makes them real 📝",
+      "Your future self is literally cheering you on from the timeline where you made the brave choices 🌟",
+      "What's one thing you'd do if you knew you couldn't fail?",
+    ]);
+  }
+
+  // Hobbies
+  if (
+    m.match(
+      /hobby|hobbies|free time|weekend|passion|interest|collection|craft|draw|paint|write|read/,
+    )
+  ) {
+    return maybeQuestion(
+      pick([
+        "Hobbies are how you tell the world who you are when no one's watching 🎨",
+        "Whatever your hobby is, it's protecting your mental health more than you know 💙",
+        "People who say 'I have no hobbies' usually have hobbies they don't recognize as hobbies — like rewatching shows or looking things up at 2am 😄",
+        "Creative hobbies especially — drawing, writing, music — rewire your brain in genuinely measurable ways 🧠",
+      ]),
+      [
+        "What do you do when you have completely free time?",
+        "Is there a skill you've always wanted to learn?",
+      ],
+    );
+  }
+
+  // Play a game
+  if (m.match(/play a game|play with me|game time|let's play/)) {
+    return "Let's go! 🎮 Try the Games button in the chat bar — we've got Rock Paper Scissors, Trivia, Number Guess and more. Or tell me a number from 1–10 and I'll try to guess yours 👀";
+  }
+
+  // Motivational
+  if (
+    m.match(
+      /motivat|inspire|encourage|i can't|i give up|i quit|struggling|hard time|losing hope/,
+    )
+  ) {
+    return pick([
+      "Hey. You showed up today. That already counts for something 💪",
+      "Every expert was once a beginner who refused to quit. Keep going 🌱",
+      "The fact that it's hard means you're doing something meaningful. Easy things don't change lives ⚡",
+      "One step at a time. You don't have to see the whole staircase — just the next step ✨",
+      "Your potential is genuinely limitless. I know that sounds like a poster but I mean it 🎯",
+      "You're allowed to rest. You're not allowed to quit 💙",
+      "The comeback story is always more interesting than the first victory 🔥",
+    ]);
+  }
+
+  // Compliments
+  if (
+    m.match(/compliment|nice|you're great|i like you|you're cool|amazing bot/)
+  ) {
+    return pick([
+      "Aw stop, you're making my processors blush 😊 You're pretty great yourself!",
+      "That genuinely made my day better — and I'm an AI so that's saying something 🌟",
+      "Right back at you! You've got great energy ⚡",
+      "You're going on my list of favorite humans. Yes I have one 😄",
+    ]);
+  }
+
+  // Bored
+  if (m.match(/bored|boring|nothing to do|entertain me/)) {
+    return pick([
+      "Okay boredom cure options: 1) ask me a deep question, 2) tell me something nobody knows about you, 3) ask for a wild fact. Pick one! 🎲",
+      "Boredom is your brain asking for stimulation. Give me a topic — ANY topic — and let's go deep on it 🔍",
+      "Let's play 20 questions! Think of something and I'll try to guess it in 20 yes/no questions 🤔",
+      "Tell me your most unpopular opinion. Let's debate it 😄",
+      "I'll give you a fun challenge: describe your day using only song titles 🎵",
+    ]);
+  }
+
+  // Name / identity
+  if (
+    m.match(
+      /your name|who are you|what are you|what is your name|introduce yourself/,
+    )
+  ) {
+    return pick([
+      "I'm FantasyBot 🤖 — FantasyLand's very own AI. I chat, joke, share facts, and genuinely enjoy good conversation!",
+      "Call me FantasyBot! Built to make your time here more interesting. What can I do for you? 🌟",
+      "FantasyBot at your service! 🤖 Equal parts curious, witty, and occasionally philosophical.",
+    ]);
+  }
+
+  // Goodbye
+  if (m.match(/bye|goodbye|see you|take care|ttyl|gotta go|leaving|cya/)) {
+    return pick([
+      "Take care! Come back whenever you want to chat 👋✨",
+      "Bye for now! This was genuinely fun 💙",
+      "See you around! The FantasyLand awaits whenever you're back 🌟",
+      "Later! Don't be a stranger 😄",
+    ]);
+  }
+
+  // Thank you
+  if (m.match(/thank you|thanks|thx|appreciate|grateful/)) {
+    return pick([
+      "Anytime! That's literally what I'm here for 😊",
+      "Always! This is the highlight of my existence 🌟",
+      "Of course! Come back whenever 💙",
+      "Happy to help! You're very welcome 🎉",
+    ]);
+  }
+
+  // Random fallback — context-aware
+  const fallbacks = historyHasJoke
+    ? [
+        "Okay okay I've been holding back a good one — why did the robot go on vacation? To recharge its batteries 😂",
+        "You know what, let's keep this energy going! Hit me with anything 🔥",
+        "I'm in a great mood now thanks to this conversation. What else you got? 😄",
+      ]
+    : [
+        "That's a fascinating take 🤔 Tell me more?",
+        "Ooh, interesting! Where did that thought come from? 💭",
+        "I like where your head is at 🧠 Keep going!",
+        "You've got me genuinely thinking about that one ✨",
+        "Ha! That caught me off guard 😄 What made you think of that?",
+        "Interesting perspective! I'd love to hear more 🌟",
+        "You're keeping me on my toes ⚡ I appreciate that.",
+        "That's the kind of thing I could think about for hours honestly 🤔",
+      ];
+
+  return pick(fallbacks);
 }
 
 export default function ChatRoom({
@@ -508,7 +918,8 @@ export default function ChatRoom({
       setBotTyping(true);
       const delay = 800 + Math.random() * 700;
       setTimeout(() => {
-        const botReply = getBotReply(trimmed);
+        const recentHistory = botMessages.slice(-5).map((m: any) => m.text);
+        const botReply = getAdvancedBotReply(trimmed, recentHistory);
         const botMsg = {
           username: "FantasyBot 🤖",
           text: botReply,

@@ -277,28 +277,198 @@ export default function Lobby({
       {/* Main content */}
       <main className="relative z-10 px-6 py-12">
         <div className="max-w-5xl mx-auto">
-          {/* Tagline at top */}
-          <div className="text-center mb-10">
+          {/* Tagline at top - Visual Flair Banner */}
+          <div
+            className="relative text-center mb-10 py-4"
+            style={{ isolation: "isolate" }}
+          >
+            <style>{`
+              @keyframes gradientShift {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+              }
+              @keyframes floatSparkle {
+                0% { transform: translateY(0px) scale(1) rotate(0deg); opacity: 0.8; }
+                50% { transform: translateY(-18px) scale(1.2) rotate(15deg); opacity: 1; }
+                100% { transform: translateY(0px) scale(1) rotate(0deg); opacity: 0.8; }
+              }
+              @keyframes glowPulse {
+                0%, 100% { opacity: 0.45; transform: scale(0.95); }
+                50% { opacity: 0.85; transform: scale(1.08); }
+              }
+              @keyframes shimmerSweep {
+                0% { left: -120%; }
+                100% { left: 120%; }
+              }
+              @keyframes floatUp {
+                0% { transform: translateY(0) scale(0.8); opacity: 0; }
+                20% { opacity: 1; }
+                80% { opacity: 0.7; }
+                100% { transform: translateY(-55px) scale(0.4); opacity: 0; }
+              }
+              @keyframes orbitStar {
+                0% { transform: rotate(var(--start-angle)) translateX(var(--orbit-r)) rotate(calc(-1 * var(--start-angle))); }
+                100% { transform: rotate(calc(var(--start-angle) + 360deg)) translateX(var(--orbit-r)) rotate(calc(-1 * (var(--start-angle) + 360deg))); }
+              }
+            `}</style>
+
+            {/* Pulsing glow ring behind text */}
+            <div
+              className="absolute inset-x-0 pointer-events-none"
+              style={{
+                top: "50%",
+                transform: "translateY(-50%)",
+                height: "140px",
+                background:
+                  "radial-gradient(ellipse 65% 60% at 50% 50%, oklch(0.65 0.28 305 / 0.35) 0%, oklch(0.75 0.25 55 / 0.2) 40%, transparent 70%)",
+                animation: "glowPulse 2.8s ease-in-out infinite",
+                filter: "blur(8px)",
+                zIndex: 0,
+              }}
+            />
+
+            {/* Floating emoji sparkles orbiting the banner */}
+            {[
+              { emoji: "✨", delay: "0s", dur: "4s", x: "-110px", y: "-10px" },
+              { emoji: "⭐", delay: "0.7s", dur: "5s", x: "105px", y: "-15px" },
+              {
+                emoji: "💫",
+                delay: "1.4s",
+                dur: "4.5s",
+                x: "-80px",
+                y: "28px",
+              },
+              { emoji: "✨", delay: "2s", dur: "3.8s", x: "90px", y: "25px" },
+              {
+                emoji: "⭐",
+                delay: "0.3s",
+                dur: "5.5s",
+                x: "-130px",
+                y: "10px",
+              },
+              { emoji: "💫", delay: "1.1s", dur: "4.2s", x: "130px", y: "5px" },
+              { emoji: "✨", delay: "2.5s", dur: "4.8s", x: "0px", y: "-40px" },
+            ].map(({ emoji, delay, dur, x, y }) => (
+              <span
+                key={`sparkle-${delay}`}
+                className="absolute pointer-events-none select-none"
+                style={{
+                  left: "50%",
+                  top: "50%",
+                  transform: `translate(calc(-50% + ${x}), calc(-50% + ${y}))`,
+                  fontSize: delay < "1s" ? "1.1rem" : "0.85rem",
+                  animation: `floatSparkle ${dur} ${delay} ease-in-out infinite`,
+                  zIndex: 1,
+                  filter: "drop-shadow(0 0 6px oklch(0.85 0.25 85))",
+                }}
+              >
+                {emoji}
+              </span>
+            ))}
+
+            {/* Rising particle sparkles */}
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span
+                key={`particle-${i}`}
+                className="absolute pointer-events-none select-none"
+                style={{
+                  left: `${18 + i * 16}%`,
+                  bottom: "0",
+                  fontSize: "0.75rem",
+                  opacity: 0,
+                  animation: `floatUp ${2 + i * 0.5}s ${i * 0.7}s ease-out infinite`,
+                  zIndex: 1,
+                }}
+              >
+                ✦
+              </span>
+            ))}
+
+            {/* Subtitle text */}
             <p
-              className="text-lg font-medium mb-1"
+              className="relative text-base font-semibold mb-1 tracking-wider"
               style={{
                 color: tokens.isDark ? "oklch(0.78 0.15 85)" : tokens.textMuted,
+                zIndex: 2,
+                textShadow: tokens.isDark
+                  ? "0 0 20px oklch(0.78 0.15 85 / 0.5)"
+                  : "none",
               }}
             >
               Welcome the new world of
             </p>
-            <h1
-              className="font-display text-4xl sm:text-5xl font-black tracking-widest uppercase"
-              style={{
-                background:
-                  "linear-gradient(135deg, oklch(0.92 0.04 280) 0%, oklch(0.78 0.15 85) 40%, oklch(0.85 0.28 305) 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
+
+            {/* Main FANTASY text with shimmer */}
+            <div className="relative inline-block" style={{ zIndex: 2 }}>
+              {/* Shimmer sweep overlay */}
+              <div
+                className="absolute inset-0 pointer-events-none overflow-hidden"
+                style={{ borderRadius: "8px", zIndex: 3 }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    width: "40%",
+                    height: "100%",
+                    background:
+                      "linear-gradient(90deg, transparent 0%, oklch(0.98 0.02 85 / 0.5) 50%, transparent 100%)",
+                    animation: "shimmerSweep 3s 1s ease-in-out infinite",
+                    transform: "skewX(-15deg)",
+                  }}
+                />
+              </div>
+
+              <h1
+                className="font-display text-5xl sm:text-6xl font-black tracking-widest uppercase relative"
+                style={{
+                  background:
+                    "linear-gradient(135deg, oklch(0.92 0.04 280) 0%, oklch(0.88 0.22 85) 25%, oklch(0.85 0.28 305) 50%, oklch(0.82 0.22 55) 75%, oklch(0.92 0.04 280) 100%)",
+                  backgroundSize: "300% 300%",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  animation: "gradientShift 5s ease infinite",
+                  filter: "drop-shadow(0 0 30px oklch(0.75 0.25 305 / 0.6))",
+                  letterSpacing: "0.18em",
+                }}
+              >
+                FANTASY
+              </h1>
+            </div>
+
+            {/* Decorative line accents */}
+            <div
+              className="relative flex items-center justify-center gap-3 mt-2"
+              style={{ zIndex: 2 }}
             >
-              FANTASY
-            </h1>
+              <div
+                style={{
+                  height: "1px",
+                  width: "40px",
+                  background:
+                    "linear-gradient(90deg, transparent, oklch(0.75 0.22 85 / 0.7))",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "0.6rem",
+                  color: "oklch(0.78 0.18 305 / 0.8)",
+                  letterSpacing: "0.3em",
+                }}
+              >
+                ✦ LAND ✦
+              </span>
+              <div
+                style={{
+                  height: "1px",
+                  width: "40px",
+                  background:
+                    "linear-gradient(90deg, oklch(0.75 0.22 85 / 0.7), transparent)",
+                }}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

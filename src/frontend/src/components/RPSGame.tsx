@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { useGameSounds } from "../hooks/useGameSounds";
 import {
   useCreateRPSChallenge,
   usePlayRPS,
@@ -27,6 +28,7 @@ const MOVES = [
 ];
 
 export default function RPSGame({ roomId, username, onSendMessage }: Props) {
+  const { playWin, playLose, playCorrect, playStart } = useGameSounds();
   const [state, setState] = useState<GameState>("idle");
   const [gameId, setGameId] = useState<string | null>(null);
   const [myMove, setMyMove] = useState<string | null>(null);
@@ -38,15 +40,20 @@ export default function RPSGame({ roomId, username, onSendMessage }: Props) {
     state === "waiting" || state === "playing",
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: sound fns are stable
   useEffect(() => {
     if (!game) return;
     if (game.status === "playing" && state === "waiting") {
       setState("playing");
+      playStart();
     }
     if (game.status === "done" || game.result) {
       setState("done");
+      if (game.result === "draw") playCorrect();
+      else if (game.result === username) playWin();
+      else playLose();
     }
-  }, [game, state]);
+  }, [game, state, username, playStart, playCorrect, playWin, playLose]);
 
   const handleChallenge = async () => {
     try {
